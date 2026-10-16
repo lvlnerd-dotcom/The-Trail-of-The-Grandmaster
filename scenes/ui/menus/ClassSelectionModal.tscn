@@ -1,0 +1,157 @@
+[gd_scene load_steps=2 format=3 uid="uid://class_selection_modal_01"]
+
+[ext_resource type="Script" path="res://scripts/ui/ClassSelectionModal.gd" id="1_modal"]
+
+[node name="ClassSelectionModal" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -290.0
+offset_right = 450.0
+offset_bottom = 290.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_modal")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+text = "POST-FLOOR 2 SPECIALIZATION: SELECT YOUR CLASS"
+horizontal_alignment = 1
+
+[node name="FilterBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="BtnFilterAll" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "All"
+
+[node name="BtnFilterMartial" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "Martial"
+
+[node name="BtnFilterRogue" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "Rogue/Ranged"
+
+[node name="BtnFilterArcane" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "Arcane"
+
+[node name="BtnFilterDivine" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "Divine"
+
+[node name="BtnFilterHybrid" type="Button" parent="VBox/FilterBar"]
+layout_mode = 2
+text = "Hybrid"
+
+[node name="HSeparator1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="MainSplit" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="LeftPane" type="VBoxContainer" parent="VBox/MainSplit"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LabelClasses" type="Label" parent="VBox/MainSplit/LeftPane"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+text = "Specialization Paths:"
+
+[node name="Scroll" type="ScrollContainer" parent="VBox/MainSplit/LeftPane"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ClassList" type="VBoxContainer" parent="VBox/MainSplit/LeftPane/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="VSeparator" type="VSeparator" parent="VBox/MainSplit"]
+layout_mode = 2
+
+[node name="RightPane" type="ScrollContainer" parent="VBox/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="DetailVBox" type="VBoxContainer" parent="VBox/MainSplit/RightPane"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="LabelClassName" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "Class Name"
+
+[node name="LabelArchetype" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "Archetype: None"
+
+[node name="LabelDescription" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
+theme_override_font_sizes/font_size = 12
+text = "Description here..."
+autowrap_mode = 2
+
+[node name="HSep1" type="HSeparator" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+
+[node name="TextPrereqs" type="RichTextLabel" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 12
+bbcode_enabled = true
+text = "Prerequisites"
+fit_content = true
+
+[node name="HSep2" type="HSeparator" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+
+[node name="TextPerks" type="RichTextLabel" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 12
+bbcode_enabled = true
+text = "Perks & Bonuses"
+fit_content = true
+
+[node name="HSep3" type="HSeparator" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+
+[node name="LabelEligibilityStatus" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+theme_override_font_sizes/font_size = 14
+text = "STATUS: ELIGIBLE"
+
+[node name="HSeparator2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+alignment = 2
+
+[node name="BtnConfirm" type="Button" parent="VBox/BottomBar"]
+custom_minimum_size = Vector2(280, 36)
+layout_mode = 2
+text = "Confirm Specialization"

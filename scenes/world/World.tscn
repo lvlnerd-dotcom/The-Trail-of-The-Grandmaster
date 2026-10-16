@@ -1,0 +1,97 @@
+[gd_scene load_steps=12 format=3 uid="uid://dry0khfkbb2po"]
+
+[ext_resource type="Script" path="res://scripts/world/World.gd" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/world/DungeonGrid.tscn" id="2_grid"]
+[ext_resource type="PackedScene" path="res://scenes/world/TurnManager.tscn" id="3_turn"]
+[ext_resource type="Script" path="res://scripts/world/GridVisualizer.gd" id="4_viz"]
+[ext_resource type="Script" path="res://scripts/world/FloorCollapseManager.gd" id="5_collapse"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/LevelUpModal.tscn" id="6_levelup"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/ClassSelectionModal.tscn" id="7_class_modal"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/GameOverModal.tscn" id="8_game_over"]
+[ext_resource type="Script" path="res://scripts/world/DecalsLayer.gd" id="9_decals"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/VictoryModal.tscn" id="10_victory_modal"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/BestiaryModal.tscn" id="11_bestiary_modal"]
+
+[node name="World" type="Node2D"]
+script = ExtResource("1_world")
+
+[node name="DungeonGrid" parent="." instance=ExtResource("2_grid")]
+
+[node name="TurnManager" parent="." instance=ExtResource("3_turn")]
+
+[node name="FloorCollapseManager" type="Node" parent="."]
+script = ExtResource("5_collapse")
+
+[node name="GridVisualizer" type="Node2D" parent="."]
+script = ExtResource("4_viz")
+
+[node name="DecalsLayer" type="Node2D" parent="."]
+script = ExtResource("9_decals")
+
+[node name="DungeonObjects" type="Node2D" parent="."]
+
+[node name="Entities" type="Node2D" parent="."]
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+
+[node name="HUD" type="MarginContainer" parent="UILayer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 120.0
+grow_horizontal = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Panel" type="Panel" parent="UILayer/HUD"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UILayer/HUD"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LabelTitle" type="Label" parent="UILayer/HUD/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "TRAIL OF THE GRANDMASTER  |  Phase 7: Boss Encounter & Victory Loop"
+
+[node name="LabelStatus" type="Label" parent="UILayer/HUD/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "Turn: 1 | Turns Left: 785/785 | State: WAITING_FOR_INPUT"
+
+[node name="LabelVitals" type="Label" parent="UILayer/HUD/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 0.7, 1)
+theme_override_font_sizes/font_size = 13
+text = "HP: 100/100 | Mana: 50/50 | Level: 1"
+
+[node name="LabelLog" type="Label" parent="UILayer/HUD/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 13
+text = "Action: Standby."
+
+[node name="LabelControls" type="Label" parent="UILayer/HUD/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 12
+text = "Controls: WASD / Numpad (8-way 1-9) / Arrow Keys to move | Space / Numpad 5 / '.' to wait | Left-Click to move"
+
+[node name="LevelUpModal" parent="UILayer" instance=ExtResource("6_levelup")]
+visible = false
+
+[node name="ClassSelectionModal" parent="UILayer" instance=ExtResource("7_class_modal")]
+visible = false
+
+[node name="GameOverModal" parent="UILayer" instance=ExtResource("8_game_over")]
+visible = false
+
+[node name="VictoryModal" parent="UILayer" instance=ExtResource("10_victory_modal")]
+visible = false
+
+[node name="BestiaryModal" parent="UILayer" instance=ExtResource("11_bestiary_modal")]
+visible = false

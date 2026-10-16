@@ -1,0 +1,32 @@
+[gd_scene load_steps=8 format=3 uid="uid://enemy_entity_01"]
+
+[ext_resource type="Script" path="res://scripts/entities/Enemy.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://icon.svg" id="2_texture"]
+[ext_resource type="Script" path="res://scripts/components/StatsComponent.gd" id="3_stats"]
+[ext_resource type="Script" path="res://scripts/components/SkillComponent.gd" id="4_skills"]
+[ext_resource type="Script" path="res://scripts/components/CombatComponent.gd" id="5_combat"]
+[ext_resource type="Script" path="res://scripts/components/InventoryComponent.gd" id="6_inv"]
+[ext_resource type="Script" path="res://scripts/components/VisionComponent.gd" id="7_vision"]
+
+[node name="Enemy" type="CharacterBody2D"]
+script = ExtResource("1_enemy")
+
+[node name="VisualSprite" type="Sprite2D" parent="."]
+modulate = Color(0.92, 0.25, 0.25, 1)
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("2_texture")
+
+[node name="StatsComponent" type="Node" parent="."]
+script = ExtResource("3_stats")
+
+[node name="SkillComponent" type="Node" parent="."]
+script = ExtResource("4_skills")
+
+[node name="CombatComponent" type="Node" parent="."]
+script = ExtResource("5_combat")
+
+[node name="InventoryComponent" type="Node" parent="."]
+script = ExtResource("6_inv")
+
+[node name="VisionComponent" type="Node" parent="."]
+script = ExtResource("7_vision")

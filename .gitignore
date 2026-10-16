@@ -1,0 +1,22 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Godot-specific ignores
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+
+# Export / Build outputs (uncomment if building into project root)
+# export_presets.cfg
+# build/

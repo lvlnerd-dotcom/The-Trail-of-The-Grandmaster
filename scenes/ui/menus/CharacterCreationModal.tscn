@@ -1,0 +1,302 @@
+[gd_scene load_steps=2 format=3 uid="uid://char_creation_modal_01"]
+
+[ext_resource type="Script" path="res://scripts/ui/CharacterCreationModal.gd" id="1_modal"]
+
+[node name="CharacterCreationModal" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -340.0
+offset_top = -260.0
+offset_right = 340.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_modal")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderBox" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="LabelTitle" type="Label" parent="VBox/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "EXPEDITION PREPARATION — CORE ATTRIBUTES"
+horizontal_alignment = 1
+
+[node name="LabelPointsRemaining" type="Label" parent="VBox/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "Attribute Points Remaining: 20"
+horizontal_alignment = 1
+
+[node name="HSeparator1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="StatsGrid" type="GridContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 6
+columns = 4
+
+[node name="LblStr" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Strength (STR):"
+
+[node name="BtnStrMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValStr" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnStrPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="LblDex" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Dexterity (DEX):"
+
+[node name="BtnDexMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValDex" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnDexPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="LblCon" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Constitution (CON):"
+
+[node name="BtnConMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValCon" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnConPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="LblInt" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Intelligence (INT):"
+
+[node name="BtnIntMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValInt" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnIntPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="LblWis" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Wisdom (WIS):"
+
+[node name="BtnWisMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValWis" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnWisPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="LblCha" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "Charisma (CHA):"
+
+[node name="BtnChaMinus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+disabled = true
+text = "-"
+
+[node name="ValCha" type="Label" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="BtnChaPlus" type="Button" parent="VBox/StatsGrid"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = "+"
+
+[node name="HSeparator2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="DerivedBox" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="LabelDerivedHeader" type="Label" parent="VBox/DerivedBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Projected Baseline Vitals:"
+
+[node name="GridDerived" type="GridContainer" parent="VBox/DerivedBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 2
+columns = 5
+
+[node name="LblHP" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Max Health:"
+
+[node name="LblMana" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Max Mana:"
+
+[node name="LblCarry" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Max Carry:"
+
+[node name="LblMelee" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Melee Bonus:"
+
+[node name="LblCrit" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Crit Chance:"
+
+[node name="ValHP" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "87 HP"
+
+[node name="ValMana" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "42 MP"
+
+[node name="ValCarry" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "37 Stones"
+
+[node name="ValMelee" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.6, 0.2, 1)
+theme_override_font_sizes/font_size = 12
+text = "-12%"
+
+[node name="ValCrit" type="Label" parent="VBox/DerivedBox/GridDerived"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.8, 1)
+theme_override_font_sizes/font_size = 12
+text = "5.0%"
+
+[node name="HSeparator3" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="BackgroundBox" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LabelBgHeader" type="Label" parent="VBox/BackgroundBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "Starting Background Package:"
+
+[node name="OptionBackground" type="OptionButton" parent="VBox/BackgroundBox"]
+layout_mode = 2
+
+[node name="LabelBgDescription" type="Label" parent="VBox/BackgroundBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 11
+text = "A daring seeker of fortune with balanced starting traits."
+autowrap_mode = 2
+
+[node name="HSeparator4" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="ButtonsBox" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="BtnEmbark" type="Button" parent="VBox/ButtonsBox"]
+custom_minimum_size = Vector2(170, 36)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 1, 0.4, 1)
+disabled = true
+text = "Embark on Expedition"
+
+[node name="BtnReset" type="Button" parent="VBox/ButtonsBox"]
+custom_minimum_size = Vector2(120, 36)
+layout_mode = 2
+text = "Reset Defaults"
+
+[node name="BtnCancel" type="Button" parent="VBox/ButtonsBox"]
+custom_minimum_size = Vector2(100, 36)
+layout_mode = 2
+text = "Back"

@@ -1,0 +1,43 @@
+[gd_scene load_steps=9 format=3 uid="uid://player_entity_01"]
+
+[ext_resource type="Script" path="res://scripts/entities/Player.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://icon.svg" id="2_texture"]
+[ext_resource type="Script" path="res://scripts/components/StatsComponent.gd" id="3_stats"]
+[ext_resource type="Script" path="res://scripts/components/SkillComponent.gd" id="4_skills"]
+[ext_resource type="Script" path="res://scripts/components/InventoryComponent.gd" id="5_inventory"]
+[ext_resource type="Script" path="res://scripts/components/CombatComponent.gd" id="6_combat"]
+[ext_resource type="Script" path="res://scripts/components/VisionComponent.gd" id="7_vision"]
+[ext_resource type="Script" path="res://scripts/world/DungeonCamera.gd" id="8_camera"]
+[ext_resource type="Script" path="res://scripts/components/SpellCastingComponent.gd" id="9_magic"]
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_script")
+
+[node name="VisualSprite" type="Sprite2D" parent="."]
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("2_texture")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("8_camera")
+zoom = Vector2(2, 2)
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
+
+[node name="StatsComponent" type="Node" parent="."]
+script = ExtResource("3_stats")
+
+[node name="SkillComponent" type="Node" parent="."]
+script = ExtResource("4_skills")
+
+[node name="InventoryComponent" type="Node" parent="."]
+script = ExtResource("5_inventory")
+
+[node name="CombatComponent" type="Node" parent="."]
+script = ExtResource("6_combat")
+
+[node name="VisionComponent" type="Node" parent="."]
+script = ExtResource("7_vision")
+
+[node name="SpellCastingComponent" type="Node" parent="."]
+script = ExtResource("9_magic")
+
