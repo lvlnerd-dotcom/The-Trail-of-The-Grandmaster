@@ -7,7 +7,15 @@ signal health_changed(current: float, maximum: float)
 signal mana_changed(current: float, maximum: float)
 signal entity_died(entity: Node2D)
 
-@export var attributes: AttributesData
+@export var attributes: AttributesData:
+    set(value):
+        if attributes and attributes.attribute_changed.is_connected(_on_attribute_changed):
+            attributes.attribute_changed.disconnect(_on_attribute_changed)
+        attributes = value
+        if attributes:
+            if not attributes.attribute_changed.is_connected(_on_attribute_changed):
+                attributes.attribute_changed.connect(_on_attribute_changed)
+            _recalculate_max_vitals(true)
 
 var current_hp: float = 100.0
 var current_mana: float = 50.0
@@ -29,8 +37,8 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
     if not attributes:
         attributes = AttributesData.new()
-    
-    attributes.attribute_changed.connect(_on_attribute_changed)
+    elif not attributes.attribute_changed.is_connected(_on_attribute_changed):
+        attributes.attribute_changed.connect(_on_attribute_changed)
     _recalculate_max_vitals(true)
 
 func _recalculate_max_vitals(reset_to_full: bool = false) -> void:

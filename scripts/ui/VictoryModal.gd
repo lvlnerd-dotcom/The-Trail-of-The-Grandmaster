@@ -89,7 +89,7 @@ func open_modal(summary: Dictionary) -> void:
 		label_progress_text.text = "Maximum Rank Reached"
 
 func close_modal() -> void:
-	super.close_modal()
+	visible = false
 	emit_signal("closed")
 
 func _on_main_menu_pressed() -> void:

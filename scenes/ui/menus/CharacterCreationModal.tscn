@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://char_creation_modal_01"]
 
-[ext_resource type="Script" path="res://scripts/ui/CharacterCreationModal.gd" id="1_modal"]
+[ext_resource type="Script" uid="uid://dau2ds86rnl2j" path="res://scripts/ui/CharacterCreationModal.gd" id="1_modal"]
 
 [node name="CharacterCreationModal" type="PanelContainer"]
 anchors_preset = 8

@@ -211,20 +211,23 @@ func trigger_slot(slot_idx: int, target_cell: Vector2i = Vector2i(-1, -1)) -> Di
 		if not inv or not s.item:
 			return {"success": false, "message": "Item unavailable"}
 
-		if s.item.item_type == ItemData.ItemType.CONSUMABLE:
+		var item_ref = s.item
+		var it_name = item_ref.item_name
+
+		if item_ref.item_type == ItemData.ItemType.CONSUMABLE:
 			# Use consumable: heal or cure
 			var heal_amt = 25
 			player.stats.current_hp = minf(player.stats.current_hp + heal_amt, player.stats.attributes.get_max_health())
-			s.item.quantity -= 1
-			if s.item.quantity <= 0:
-				inv.remove_item(s.item)
+			item_ref.quantity -= 1
+			if item_ref.quantity <= 0:
+				inv.remove_item(item_ref)
 				clear_slot(slot_idx)
 			refresh_hotbar()
-			var msg = "Consumed %s (+%d HP restored)" % [s.item.item_name, heal_amt]
+			var msg = "Consumed %s (+%d HP restored)" % [it_name, heal_amt]
 			emit_signal("hotbar_action_executed", slot_idx, "consumable", {"success": true, "message": msg})
 			return {"success": true, "message": msg}
 
-		elif s.item.item_type == ItemData.ItemType.AMMO:
+		elif item_ref.item_type == ItemData.ItemType.AMMO:
 			# Throw dagger/knife at closest visible enemy
 			var best_enemy: Node2D = null
 			var best_dist = 999
@@ -235,16 +238,17 @@ func trigger_slot(slot_idx: int, target_cell: Vector2i = Vector2i(-1, -1)) -> Di
 						best_dist = dist
 						best_enemy = e
 			if not best_enemy:
-				return {"success": false, "message": "No enemy in range to throw %s at!" % s.item.item_name}
+				return {"success": false, "message": "No enemy in range to throw %s at!" % it_name}
 
 			var dmg = randi_range(6, 12)
 			best_enemy.stats.take_damage(dmg)
-			s.item.quantity -= 1
-			if s.item.quantity <= 0:
-				inv.remove_item(s.item)
+			item_ref.quantity -= 1
+			if item_ref.quantity <= 0:
+				inv.remove_item(item_ref)
 				clear_slot(slot_idx)
 			refresh_hotbar()
-			var msg = "Threw %s at %s for %d damage!" % [s.item.item_name, best_enemy.enemy_name, dmg]
+			var def_name = best_enemy.get("enemy_name") if "enemy_name" in best_enemy else best_enemy.name
+			var msg = "Threw %s at %s for %d damage!" % [it_name, def_name, dmg]
 			emit_signal("hotbar_action_executed", slot_idx, "throw", {"success": true, "message": msg, "target": best_enemy})
 			return {"success": true, "message": msg}
 

@@ -12,24 +12,6 @@ const InventoryComponent = preload("res://scripts/components/InventoryComponent.
 const BaseEntity = preload("res://scripts/entities/BaseEntity.gd")
 const Player = preload("res://scripts/entities/Player.gd")
 
-func _init() -> void:
-	var scripts_to_reload = [
-		"res://scripts/entities/BaseEntity.gd",
-		"res://scripts/entities/Player.gd",
-		"res://scripts/resources/ItemData.gd",
-		"res://scripts/components/InventoryComponent.gd",
-		"res://scripts/resources/SkillData.gd",
-		"res://scripts/components/SkillComponent.gd",
-		"res://scripts/resources/MetaProfileData.gd",
-		"res://scripts/resources/CharacterCreationData.gd",
-		"res://scripts/resources/ClassData.gd",
-		"res://scripts/resources/ClassCatalog.gd"
-	]
-	for p in scripts_to_reload:
-		var scr = load(p) as GDScript
-		if scr:
-			scr.reload()
-
 func suite_name() -> String:
 	return "phase6_class_specialization_and_meta"
 
