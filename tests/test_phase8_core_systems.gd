@@ -269,3 +269,44 @@ func test_stairs_down_strict_line_of_sight_visibility() -> void:
 	stairs.update_visibility_from_fog(fow)
 	assert_false(stairs.visible, "Stairs must be hidden when tile is only in EXPLORED fog memory")
 
+func test_hallway_usability_and_wall_reveal_buffer() -> void:
+	var fow = track(FogOfWarSystem.new()) as FogOfWarSystem
+	fow.init_fog(30, 30)
+	
+	var grid = track(DungeonGrid.new()) as DungeonGrid
+	grid.grid_width = 30
+	grid.grid_height = 30
+	grid.clear_grid()
+	
+	# Create a straight 1-tile wide East-West hallway along y = 10 from x = 5 to x = 25
+	# Walkable corridor: (x, 10) for x in [5, 25]
+	# Flanking walls: (x, 9) and (x, 11) for x in [5, 25]
+	for x in range(5, 26):
+		grid.set_cell_walkable(Vector2i(x, 10), true)
+		grid.set_cell_walkable(Vector2i(x, 9), false)
+		grid.set_cell_walkable(Vector2i(x, 11), false)
+	
+	var origin = Vector2i(10, 10)
+	# Player is at (10, 10) facing East (Vector2i.RIGHT) with sight radius 8
+	fow.update_visibility(origin, 8, grid, Vector2i.RIGHT, 2)
+	
+	# Verify floor corridor ahead is visible
+	for x in range(10, 19): # 10 to 18 (distance 8)
+		assert_true(fow.is_visible(Vector2i(x, 10)), "Floor tile (%d, 10) in hallway must be VISIBLE" % x)
+	
+	# Verify flanking walls along the entire illuminated corridor are visible via wall reveal buffer
+	for x in range(10, 19):
+		assert_true(fow.is_visible(Vector2i(x, 9)), "North flanking wall (%d, 9) in hallway must be VISIBLE" % x)
+		assert_true(fow.is_visible(Vector2i(x, 11)), "South flanking wall (%d, 11) in hallway must be VISIBLE" % x)
+	
+	# Verify walls right at the +1 edge buffer (x = 19) flanking the furthest visible floor (x = 18)
+	assert_true(fow.is_visible(Vector2i(19, 9)), "Edge North wall buffer (19, 9) must be VISIBLE")
+	assert_true(fow.is_visible(Vector2i(19, 11)), "Edge South wall buffer (19, 11) must be VISIBLE")
+	
+	# Verify explored memory: when player steps forward to (14, 10) or turns, previous corridor walls remain EXPLORED
+	fow.update_visibility(Vector2i(14, 10), 8, grid, Vector2i.RIGHT, 2)
+	assert_true(fow.is_explored(Vector2i(10, 9)), "North flanking wall at previous position remains EXPLORED")
+	assert_true(fow.is_explored(Vector2i(10, 11)), "South flanking wall at previous position remains EXPLORED")
+	assert_true(fow.is_explored(Vector2i(10, 10)), "Corridor floor at previous position remains EXPLORED")
+
+

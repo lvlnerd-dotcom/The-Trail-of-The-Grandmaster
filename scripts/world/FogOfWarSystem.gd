@@ -90,8 +90,8 @@ func update_visibility(
 	set_visibility(origin, TileVisibility.VISIBLE)
 	current_visible_cells.append(origin)
 
-	# 3. Evaluate cells within the bounding box of sight_radius
-	var r = maxi(sight_radius, p_peripheral_radius)
+	# 3. Evaluate cells within the bounding box of sight_radius (+1 buffer for wall reveals)
+	var r = maxi(sight_radius, p_peripheral_radius) + 1
 	var min_x = maxi(0, origin.x - r)
 	var max_x = mini(grid_width - 1, origin.x + r)
 	var min_y = maxi(0, origin.y - r)
@@ -105,7 +105,12 @@ func update_visibility(
 			
 			var dist = Vector2(target - origin).length()
 			var in_cone = is_in_vision_cone(origin, target, facing_direction, cone_angle_degrees)
-			var allowed_dist = float(sight_radius) + 0.001 if in_cone else float(p_peripheral_radius) + 0.25
+			var is_wall = grid != null and grid.wall_cells.has(target)
+			
+			# Wall Reveal Buffer: Walls flanking or along the edge receive a +1 tile distance buffer
+			var base_sight = float(sight_radius) + (1.0 if is_wall else 0.0)
+			var base_periph = float(p_peripheral_radius) + (1.0 if is_wall else 0.0)
+			var allowed_dist = base_sight + 0.001 if in_cone else base_periph + 0.25
 			
 			if dist > allowed_dist:
 				continue
@@ -115,6 +120,29 @@ func update_visibility(
 				if idx != -1:
 					visibility_buffer[idx] = TileVisibility.VISIBLE
 					current_visible_cells.append(target)
+
+	# 4. Structural Wall Buffer: Any wall tile directly adjacent (8-directional) to an
+	# actively visible floor tile within sight range is illuminated so hallways are properly flanked
+	if grid != null:
+		var visible_floor_cells: Array[Vector2i] = []
+		for cell in current_visible_cells:
+			if not grid.wall_cells.has(cell):
+				visible_floor_cells.append(cell)
+				
+		var max_wall_dist = float(sight_radius + 1) + 0.5
+		for f_cell in visible_floor_cells:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					if dx == 0 and dy == 0:
+						continue
+					var adj_cell = f_cell + Vector2i(dx, dy)
+					if grid.wall_cells.has(adj_cell):
+						var d_from_origin = Vector2(adj_cell - origin).length()
+						if d_from_origin <= max_wall_dist:
+							var w_idx = _cell_to_index(adj_cell)
+							if w_idx != -1 and visibility_buffer[w_idx] != TileVisibility.VISIBLE:
+								visibility_buffer[w_idx] = TileVisibility.VISIBLE
+								current_visible_cells.append(adj_cell)
 
 	emit_signal("visibility_updated", current_visible_cells)
 
