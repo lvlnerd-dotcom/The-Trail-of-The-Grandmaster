@@ -1,3 +1,4 @@
+@tool
 class_name FogOfWarSystem
 extends Node
 
@@ -48,13 +49,37 @@ func set_visibility(cell: Vector2i, state: TileVisibility) -> void:
 	if idx != -1 and idx < visibility_buffer.size():
 		visibility_buffer[idx] = state
 
-## Updates the field-of-view from origin out to sight_radius.
-## Demotes previously visible cells to EXPLORED, and raycasts to illuminate new cells.
-func update_visibility(origin: Vector2i, sight_radius: int, grid: DungeonGrid) -> void:
+const DEFAULT_CONE_ANGLE_DEG: float = 45.0
+const DEFAULT_PERIPHERAL_RADIUS: int = 2
+
+@export var cone_angle_degrees: float = DEFAULT_CONE_ANGLE_DEG
+@export var peripheral_radius: int = DEFAULT_PERIPHERAL_RADIUS
+
+## Checks whether a target cell falls within the forward directional vision cone (default 45-degree arc).
+func is_in_vision_cone(origin: Vector2i, target: Vector2i, facing_direction: Vector2i, cone_angle_deg: float = DEFAULT_CONE_ANGLE_DEG) -> bool:
+	if target == origin or facing_direction == Vector2i.ZERO:
+		return true
+	var f_vec = Vector2(facing_direction).normalized()
+	var t_vec = Vector2(target - origin).normalized()
+	var half_angle_rad = deg_to_rad(cone_angle_deg * 0.5)
+	var angle_diff = absf(f_vec.angle_to(t_vec))
+	return angle_diff <= (half_angle_rad + 0.001)
+
+## Updates the field-of-view from origin.
+## If facing_direction is non-zero, applies full sight_radius within the 45-degree forward vision cone
+## and reduced p_peripheral_radius behind and to the sides.
+## Demotes previously visible cells to EXPLORED (permanent memory), and illuminates visible cells.
+func update_visibility(
+	origin: Vector2i,
+	sight_radius: int,
+	grid: DungeonGrid,
+	facing_direction: Vector2i = Vector2i.ZERO,
+	p_peripheral_radius: int = DEFAULT_PERIPHERAL_RADIUS
+) -> void:
 	if visibility_buffer.size() < grid_width * grid_height:
-		init_fog(grid.grid_width, grid.grid_height)
+		init_fog(grid.grid_width if grid else grid_width, grid.grid_height if grid else grid_height)
 	
-	# 1. Demote all currently visible cells to EXPLORED
+	# 1. Demote all currently visible cells to EXPLORED (permanent memory state)
 	for cell in current_visible_cells:
 		var idx = _cell_to_index(cell)
 		if idx != -1:
@@ -65,28 +90,37 @@ func update_visibility(origin: Vector2i, sight_radius: int, grid: DungeonGrid) -
 	set_visibility(origin, TileVisibility.VISIBLE)
 	current_visible_cells.append(origin)
 
-	# 3. Cast rays to the bounding perimeter of the sight circle
-	var r = sight_radius
+	# 3. Evaluate cells within the bounding box of sight_radius
+	var r = maxi(sight_radius, p_peripheral_radius)
 	var min_x = maxi(0, origin.x - r)
 	var max_x = mini(grid_width - 1, origin.x + r)
 	var min_y = maxi(0, origin.y - r)
 	var max_y = mini(grid_height - 1, origin.y + r)
 
-	# Collect perimeter cells to raycast to
-	var targets: Array[Vector2i] = []
-	for x in range(min_x, max_x + 1):
-		targets.append(Vector2i(x, min_y))
-		targets.append(Vector2i(x, max_y))
-	for y in range(min_y + 1, max_y):
-		targets.append(Vector2i(min_x, y))
-		targets.append(Vector2i(max_x, y))
-
-	for target in targets:
-		_cast_ray(origin, target, r, grid)
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var target = Vector2i(x, y)
+			if target == origin:
+				continue
+			
+			var dist = Vector2(target - origin).length()
+			var in_cone = is_in_vision_cone(origin, target, facing_direction, cone_angle_degrees)
+			var allowed_dist = float(sight_radius) + 0.001 if in_cone else float(p_peripheral_radius) + 0.25
+			
+			if dist > allowed_dist:
+				continue
+				
+			if _has_clear_line_of_sight(origin, target, grid):
+				var idx = _cell_to_index(target)
+				if idx != -1:
+					visibility_buffer[idx] = TileVisibility.VISIBLE
+					current_visible_cells.append(target)
 
 	emit_signal("visibility_updated", current_visible_cells)
 
-func _cast_ray(p0: Vector2i, p1: Vector2i, max_dist: int, grid: DungeonGrid) -> void:
+func _has_clear_line_of_sight(p0: Vector2i, p1: Vector2i, grid: DungeonGrid) -> bool:
+	if not grid:
+		return true
 	var dx = abs(p1.x - p0.x)
 	var dy = -abs(p1.y - p0.y)
 	var sx = 1 if p0.x < p1.x else -1
@@ -95,23 +129,10 @@ func _cast_ray(p0: Vector2i, p1: Vector2i, max_dist: int, grid: DungeonGrid) -> 
 	var curr = p0
 
 	while true:
-		if curr != p0:
-			var dist = abs(curr.x - p0.x) + abs(curr.y - p0.y)
-			if dist > max_dist:
-				break
-
-			var idx = _cell_to_index(curr)
-			if idx != -1:
-				visibility_buffer[idx] = TileVisibility.VISIBLE
-				if not current_visible_cells.has(curr):
-					current_visible_cells.append(curr)
-
-			# If this cell is a wall, vision stops here (the wall itself is revealed)
-			if grid and grid.wall_cells.has(curr):
-				break
-
 		if curr == p1:
-			break
+			return true
+		if curr != p0 and grid.wall_cells.has(curr):
+			return false
 
 		var e2 = 2 * err
 		if e2 >= dy:
@@ -120,6 +141,7 @@ func _cast_ray(p0: Vector2i, p1: Vector2i, max_dist: int, grid: DungeonGrid) -> 
 		if e2 <= dx:
 			err += dx
 			curr.y += sy
+	return true
 
 ## Reveals all cells (useful for debug or whole-floor clarity scrolls)
 func reveal_all() -> void:

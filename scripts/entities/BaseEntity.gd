@@ -38,11 +38,15 @@ func init_grid_position(p_grid: DungeonGrid, p_pos: Vector2i, p_turn_manager: Tu
         grid.register_entity(self, grid_pos)
         global_position = grid.grid_to_world(grid_pos)
 
+func set_facing_direction(direction: Vector2i) -> void:
+    if direction != Vector2i.ZERO:
+        facing_direction = direction
+
 func try_move(direction: Vector2i) -> bool:
     if is_moving or not grid:
         return false
     
-    facing_direction = direction
+    set_facing_direction(direction)
     var target_cell = grid_pos + direction
     
     if grid.can_enter(target_cell):

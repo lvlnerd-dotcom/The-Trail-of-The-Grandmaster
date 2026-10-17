@@ -111,6 +111,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_handle_click_move(target_cell)
 
 func _handle_move_input(direction: Vector2i) -> void:
+	set_facing_direction(direction)
 	var target_cell = grid_pos + direction
 	
 	# Check if target cell has a hostile occupant -> Melee bump attack!
@@ -133,7 +134,7 @@ func _handle_move_input(direction: Vector2i) -> void:
 			bus.emit_signal("entity_bumped", self, target_cell)
 
 func _execute_melee_attack(target: Node2D, direction: Vector2i) -> void:
-	facing_direction = direction
+	set_facing_direction(direction)
 	_play_bump_animation(direction)
 	
 	var weapon = inventory.get_equipped_weapon()

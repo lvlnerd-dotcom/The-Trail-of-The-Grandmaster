@@ -7,9 +7,34 @@ signal target_detected(target: Node2D)
 signal target_lost(target: Node2D)
 
 @export var view_distance_tiles: int = 8
+@export var peripheral_view_distance_tiles: int = 2
 @onready var parent_entity: Node2D = get_parent() as Node2D
 
 var visible_tiles: Array[Vector2i] = []
+
+## Returns +1 vision cone tile for every 10 levels in the Perception skill.
+func get_perception_vision_bonus(observer: Node2D = null) -> int:
+    var ent = observer if observer else parent_entity
+    if not ent and get_parent() is Node2D:
+        ent = get_parent() as Node2D
+    if not ent:
+        return 0
+    var obs_skills = ent.get_node_or_null("SkillComponent") as SkillComponent
+    if not obs_skills:
+        for c in ent.get_children():
+            if c is SkillComponent:
+                obs_skills = c
+                break
+    if obs_skills:
+        var perc_skill = obs_skills.get_skill(SkillData.SkillId.PERCEPTION)
+        if perc_skill:
+            return maxi(0, int(floor(perc_skill.level / 10.0)))
+    return 0
+
+## Calculates effective maximum distance of the forward vision reveal cone:
+## Base view_distance_tiles + (1 tile per 10 levels in Perception skill).
+func get_effective_view_distance(observer: Node2D = null) -> int:
+    return view_distance_tiles + get_perception_vision_bonus(observer)
 
 ## Evaluates detection chance strictly per design document:
 ## P(Detection) = (Observer Perception + 50) / ((Target Hide + 50) * 2) + ObsBonuses - TargetBonuses
@@ -60,7 +85,7 @@ func can_see_entity(grid: DungeonGrid, from_cell: Vector2i, target: Node2D) -> b
         
     var to_cell = target.get("grid_pos") as Vector2i
     var dist = abs(from_cell.x - to_cell.x) + abs(from_cell.y - to_cell.y)
-    if dist > view_distance_tiles:
+    if dist > get_effective_view_distance():
         return false
         
     # Check Line of Sight on grid using Bresenham algorithm

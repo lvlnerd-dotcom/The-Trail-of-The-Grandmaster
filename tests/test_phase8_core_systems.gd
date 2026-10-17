@@ -3,32 +3,6 @@ extends McpTestSuite
 
 ## Phase 8 Test Suite: Opaque UI, Fog of War, Expanded Floors, 12-Slot Paperdoll, Skills UI, and Hotbar Verification
 
-const BaseModal = preload("res://scripts/ui/BaseModal.gd")
-const FogOfWarSystem = preload("res://scripts/world/FogOfWarSystem.gd")
-const DungeonGenerator = preload("res://scripts/world/DungeonGenerator.gd")
-const DungeonGrid = preload("res://scripts/world/DungeonGrid.gd")
-const FloorCollapseManager = preload("res://scripts/world/FloorCollapseManager.gd")
-const TurnManager = preload("res://scripts/world/TurnManager.gd")
-const ItemData = preload("res://scripts/resources/ItemData.gd")
-const InventoryComponent = preload("res://scripts/components/InventoryComponent.gd")
-const SkillData = preload("res://scripts/resources/SkillData.gd")
-const SpellData = preload("res://scripts/resources/SpellData.gd")
-const SpellCastingComponent = preload("res://scripts/components/SpellCastingComponent.gd")
-const HotbarBar = preload("res://scripts/ui/HotbarBar.gd")
-
-func _init() -> void:
-	var scripts_to_reload = [
-		"res://scripts/resources/ItemData.gd",
-		"res://scripts/components/InventoryComponent.gd",
-		"res://scripts/resources/SkillData.gd",
-		"res://scripts/ui/BaseModal.gd",
-		"res://scripts/ui/HotbarBar.gd"
-	]
-	for p in scripts_to_reload:
-		var scr = load(p) as GDScript
-		if scr:
-			scr.reload()
-
 func suite_name() -> String:
 	return "phase8_core_systems"
 
@@ -191,3 +165,107 @@ func test_ten_slot_bottom_hotbar_execution() -> void:
 	assert_eq(hotbar.slots[1].item.quantity, 3, "Slot 1 holds 3 potions")
 	
 	hotbar.queue_free()
+
+func test_directional_vision_cone_and_peripheral_radius() -> void:
+	var fow = track(FogOfWarSystem.new()) as FogOfWarSystem
+	fow.init_fog(30, 30)
+	
+	var grid = track(DungeonGrid.new()) as DungeonGrid
+	grid.grid_width = 30
+	grid.grid_height = 30
+	grid.clear_grid()
+	for y in range(30):
+		for x in range(30):
+			grid.set_cell_walkable(Vector2i(x, y), true)
+	
+	var origin = Vector2i(10, 10)
+	# Facing East (Vector2i.RIGHT), sight_radius = 8, peripheral_radius = 2
+	fow.update_visibility(origin, 8, grid, Vector2i.RIGHT, 2)
+	
+	# Directly ahead (East) within 8 tiles is VISIBLE
+	assert_true(fow.is_visible(Vector2i(18, 10)), "8 tiles directly East in 45-deg cone is VISIBLE")
+	assert_true(fow.is_visible(Vector2i(16, 12)), "Tile (16,12) inside 45-deg forward arc is VISIBLE")
+	assert_false(fow.is_visible(Vector2i(16, 15)), "Tile (16,15) outside 45-deg cone & beyond peripheral radius is NOT VISIBLE")
+	
+	# Behind (West) and to the sides (North/South): visible within peripheral radius 2, hidden at distance 3+
+	assert_true(fow.is_visible(Vector2i(8, 10)), "2 tiles behind (West) is within peripheral radius and VISIBLE")
+	assert_false(fow.is_visible(Vector2i(7, 10)), "3 tiles behind (West) exceeds peripheral radius and is NOT VISIBLE")
+	assert_true(fow.is_visible(Vector2i(10, 8)), "2 tiles to side (North) is within peripheral radius and VISIBLE")
+	assert_false(fow.is_visible(Vector2i(10, 7)), "3 tiles to side (North) exceeds peripheral radius and is NOT VISIBLE")
+	
+	# Turn to face West (Vector2i.LEFT): previous East cone tiles become EXPLORED, West cone becomes VISIBLE
+	fow.update_visibility(origin, 8, grid, Vector2i.LEFT, 2)
+	assert_false(fow.is_visible(Vector2i(18, 10)), "East tile (18,10) is no longer actively VISIBLE after turning West")
+	assert_true(fow.is_explored(Vector2i(18, 10)), "East tile (18,10) remains permanently EXPLORED")
+	assert_true(fow.is_visible(Vector2i(2, 10)), "8 tiles directly West is now VISIBLE")
+
+func test_perception_skill_vision_scaling() -> void:
+	var mock_player = track(Node2D.new()) as Node2D
+	var skills_comp = track(SkillComponent.new()) as SkillComponent
+	skills_comp.name = "SkillComponent"
+	mock_player.add_child(skills_comp)
+	skills_comp._ready()
+	
+	var vision = track(VisionComponent.new()) as VisionComponent
+	vision.view_distance_tiles = 8
+	mock_player.add_child(vision)
+	
+	var perc_skill: SkillData = skills_comp.get_skill(SkillData.SkillId.PERCEPTION)
+	assert_true(perc_skill != null, "Perception skill exists in SkillComponent")
+	
+	# Level 0 -> +0 bonus (total 8)
+	perc_skill.level = 0.0
+	assert_eq(vision.get_perception_vision_bonus(mock_player), 0, "Level 0 Perception grants +0 vision")
+	assert_eq(vision.get_effective_view_distance(mock_player), 8, "Base effective view distance is 8")
+	
+	# Level 9.9 -> +0 bonus (total 8)
+	perc_skill.level = 9.9
+	assert_eq(vision.get_perception_vision_bonus(mock_player), 0, "Level 9.9 Perception grants +0 vision")
+	
+	# Level 10.0 -> +1 bonus (total 9)
+	perc_skill.level = 10.0
+	assert_eq(vision.get_perception_vision_bonus(mock_player), 1, "Level 10 Perception grants +1 vision")
+	assert_eq(vision.get_effective_view_distance(mock_player), 9, "Effective view distance at 10 Perception is 9")
+	
+	# Level 25.0 -> +2 bonus (total 10)
+	perc_skill.level = 25.0
+	assert_eq(vision.get_perception_vision_bonus(mock_player), 2, "Level 25 Perception grants +2 vision")
+	assert_eq(vision.get_effective_view_distance(mock_player), 10, "Effective view distance at 25 Perception is 10")
+	
+	# Level 100.0 -> +10 bonus (total 18)
+	perc_skill.level = 100.0
+	assert_eq(vision.get_perception_vision_bonus(mock_player), 10, "Level 100 Perception grants +10 vision")
+	assert_eq(vision.get_effective_view_distance(mock_player), 18, "Effective view distance at 100 Perception is 18")
+
+func test_stairs_down_strict_line_of_sight_visibility() -> void:
+	var fow = track(FogOfWarSystem.new()) as FogOfWarSystem
+	fow.init_fog(30, 30)
+	
+	var grid = track(DungeonGrid.new()) as DungeonGrid
+	grid.grid_width = 30
+	grid.grid_height = 30
+	grid.clear_grid()
+	for y in range(30):
+		for x in range(30):
+			grid.set_cell_walkable(Vector2i(x, y), true)
+	
+	var stairs = track(StairsDown.new()) as StairsDown
+	stairs.setup(grid, Vector2i(16, 10), 1)
+	
+	# 1. Hidden state: stairs must be strictly hidden
+	assert_false(stairs.visible, "Stairs start hidden before player looks at them")
+	stairs.update_visibility_from_fog(fow)
+	assert_false(stairs.visible, "Stairs remain hidden while tile is HIDDEN")
+	
+	# 2. Player at (10, 10) facing East (Vector2i.RIGHT) with radius 8 -> stairs at (16, 10) is in active vision cone
+	fow.update_visibility(Vector2i(10, 10), 8, grid, Vector2i.RIGHT, 2)
+	stairs.update_visibility_from_fog(fow)
+	assert_true(stairs.visible, "Stairs become visible when inside active vision cone")
+	
+	# 3. Player turns North (Vector2i.UP) -> (16, 10) is now EXPLORED memory, no longer in active vision cone
+	fow.update_visibility(Vector2i(10, 10), 8, grid, Vector2i.UP, 2)
+	assert_true(fow.is_explored(Vector2i(16, 10)), "Stairs tile is in EXPLORED memory state")
+	assert_false(fow.is_visible(Vector2i(16, 10)), "Stairs tile is not actively VISIBLE")
+	stairs.update_visibility_from_fog(fow)
+	assert_false(stairs.visible, "Stairs must be hidden when tile is only in EXPLORED fog memory")
+

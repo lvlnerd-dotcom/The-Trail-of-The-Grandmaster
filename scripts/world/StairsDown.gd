@@ -1,3 +1,4 @@
+@tool
 class_name StairsDown
 extends Node2D
 
@@ -15,6 +16,16 @@ func setup(p_grid: DungeonGrid, p_pos: Vector2i, p_floor: int = 1) -> void:
     grid_pos = p_pos
     current_floor = p_floor
     position = Vector2(grid.grid_to_world(grid_pos))
+    visible = false
+    queue_redraw()
+
+## Updates stairs visibility strictly from active line-of-sight (TileVisibility.VISIBLE).
+## Stairs remain hidden in both HIDDEN and EXPLORED (memory) states until actively looked at.
+func update_visibility_from_fog(fow: FogOfWarSystem) -> void:
+    if not fow:
+        visible = false
+        return
+    visible = fow.is_visible(grid_pos)
     queue_redraw()
 
 func can_descend(entity: Node2D) -> bool:

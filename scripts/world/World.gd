@@ -529,6 +529,9 @@ func _on_state_changed(_new_state: String) -> void:
 	_update_hud()
 
 func _on_player_acted(action: String, details: Dictionary) -> void:
+	if action == "melee_attack":
+		update_fog_and_cull_entities()
+		_scan_environment_with_perception()
 	if details.has("message"):
 		if action == "enemy_attack":
 			if label_log.text.begins_with("Enemy:") or label_log.text.begins_with("Enemies:"):
@@ -546,11 +549,17 @@ func update_fog_and_cull_entities() -> void:
 	if not fow_system or not player or not is_instance_valid(player):
 		return
 	var sight_radius = 8
+	var peripheral_radius = FogOfWarSystem.DEFAULT_PERIPHERAL_RADIUS
 	if player.vision:
-		sight_radius = player.vision.view_distance_tiles
-	fow_system.update_visibility(player.grid_pos, sight_radius, grid)
+		sight_radius = player.vision.get_effective_view_distance(player)
+		peripheral_radius = player.vision.peripheral_view_distance_tiles
+	fow_system.update_visibility(player.grid_pos, sight_radius, grid, player.facing_direction, peripheral_radius)
 	if grid_visualizer:
 		grid_visualizer.queue_redraw()
+	
+	# Stairs are strictly hidden unless inside the player's active, unmasked line-of-sight cone
+	if stairs_down and is_instance_valid(stairs_down):
+		stairs_down.update_visibility_from_fog(fow_system)
 	
 	for e in enemies:
 		if is_instance_valid(e):
@@ -589,12 +598,13 @@ func _scan_environment_with_perception() -> void:
 		return
 		
 	var p_pos = player.grid_pos
+	var max_scan_dist = player.vision.get_effective_view_distance(player)
 	
 	# Check hidden Secret Doors
 	for door in secret_doors:
 		if not door.is_revealed:
 			var dist = abs(door.grid_pos.x - p_pos.x) + abs(door.grid_pos.y - p_pos.y)
-			if dist <= player.vision.view_distance_tiles:
+			if dist <= max_scan_dist and (not fow_system or fow_system.is_visible(door.grid_pos)):
 				if VisionComponent.has_line_of_sight(grid, p_pos, door.grid_pos):
 					var det_chance = VisionComponent.calculate_detection_chance(player, door)
 					if randf() <= det_chance:
@@ -610,7 +620,7 @@ func _scan_environment_with_perception() -> void:
 		var trap = traps[t_pos]
 		if not trap.is_revealed:
 			var dist = abs(t_pos.x - p_pos.x) + abs(t_pos.y - p_pos.y)
-			if dist <= player.vision.view_distance_tiles:
+			if dist <= max_scan_dist and (not fow_system or fow_system.is_visible(t_pos)):
 				if VisionComponent.has_line_of_sight(grid, p_pos, t_pos):
 					var det_chance = VisionComponent.calculate_detection_chance(player, trap)
 					if randf() <= det_chance:
@@ -620,6 +630,8 @@ func _scan_environment_with_perception() -> void:
 
 func _on_entity_bumped(entity: Node2D, target_cell: Vector2i) -> void:
 	if entity == player:
+		update_fog_and_cull_entities()
+		_scan_environment_with_perception()
 		label_log.text = "Bump! Solid wall/obstacle at %s blocks movement." % str(target_cell)
 
 func _on_player_leveled_up(new_level: int, pts: int) -> void:
@@ -629,6 +641,7 @@ func _on_player_leveled_up(new_level: int, pts: int) -> void:
 
 func _on_skill_xp_gained(s_name: String, _amt: float, cur_lvl: float) -> void:
 	label_log.text = "Skill Trained: %s reached level %.1f" % [s_name, cur_lvl]
+	update_fog_and_cull_entities()
 
 func _on_keystone_unlocked(s_name: String, milestone: int) -> void:
 	label_log.text = "Keystone Unlocked! %s achieved milestone %d!" % [s_name, milestone]
