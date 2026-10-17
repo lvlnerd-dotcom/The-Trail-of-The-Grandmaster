@@ -41,6 +41,9 @@ enum Archetype {
 @export_multiline var signature_ability_description: String = ""
 @export var signature_ability_mana_cost: int = 0
 
+@export_group("Class Exclusive Skill")
+@export var exclusive_skill_id: SkillData.SkillId = SkillData.SkillId.IMPROVISED_SURVIVAL
+
 func _init(
     p_id: String = "",
     p_name: String = "",
@@ -168,6 +171,16 @@ func apply_to_player(player: Node2D) -> Dictionary:
     player.set_meta("class_name", class_title)
     player.set_meta("class_passive_type", passive_type)
     player.set_meta("class_passive_values", passive_values)
+    
+    # Unlock and register the class-exclusive skill
+    var skills = player.get_node_or_null("SkillComponent") as SkillComponent
+    if not skills and is_instance_valid(player):
+        for child in player.get_children():
+            if child is SkillComponent:
+                skills = child
+                break
+    if skills:
+        skills.unlock_class_exclusive_skill(exclusive_skill_id, 5.0)
     
     return applied_changes
 

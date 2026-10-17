@@ -1,0 +1,127 @@
+[gd_scene load_steps=2 format=3 uid="uid://skills_modal_01"]
+
+[ext_resource type="Script" path="res://scripts/ui/SkillsModal.gd" id="1_skills"]
+
+[node name="SkillsModal" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -280.0
+offset_right = 450.0
+offset_bottom = 280.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_skills")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeaderBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="LabelTitle" type="Label" parent="VBox/HeaderBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "SKILL MASTERY & KEYSTONE MILESTONES (PRESS 'K' OR ESC TO CLOSE)"
+
+[node name="BtnClose" type="Button" parent="VBox/HeaderBar"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = " X "
+
+[node name="HSeparator1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="MainSplit" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="LeftPane" type="VBoxContainer" parent="VBox/MainSplit"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FilterBar" type="HBoxContainer" parent="VBox/MainSplit/LeftPane"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ScrollSkills" type="ScrollContainer" parent="VBox/MainSplit/LeftPane"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SkillList" type="VBoxContainer" parent="VBox/MainSplit/LeftPane/ScrollSkills"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="VSeparator" type="VSeparator" parent="VBox/MainSplit"]
+layout_mode = 2
+
+[node name="RightPane" type="VBoxContainer" parent="VBox/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailVBox" type="VBoxContainer" parent="VBox/MainSplit/RightPane"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="LabelSkillName" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+text = "SWORDSMANSHIP"
+
+[node name="LabelAttr" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Governing Core Attribute: Strength"
+
+[node name="LabelLevel" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+text = "Current Level: 05.0 / 100.0"
+
+[node name="ProgressTenth" type="ProgressBar" parent="VBox/MainSplit/RightPane/DetailVBox"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+show_percentage = false
+
+[node name="LabelProgressText" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.75, 0.8, 1)
+theme_override_font_sizes/font_size = 11
+text = "Progress to 05.1: 0% (0.0 / 20.0 XP)"
+
+[node name="HSeparator2" type="HSeparator" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+
+[node name="LabelDescription" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.85, 1)
+theme_override_font_sizes/font_size = 12
+text = "Skill lore and mechanics."
+autowrap_mode = 3
+
+[node name="HSeparator3" type="HSeparator" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+
+[node name="LabelKeystonesHeader" type="Label" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 13
+text = "KEYSTONE MILESTONES (25 / 50 / 75 / 100):"
+
+[node name="KeystonesVBox" type="VBoxContainer" parent="VBox/MainSplit/RightPane/DetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6

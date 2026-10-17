@@ -53,34 +53,31 @@ enum DamageType {
 
 @export_group("Range & Area")
 @export var range_tiles: int = 5
-@export var area_radius: int = 0:
+@export var area_radius: int = 0
+
+var aoe_radius: int:
+	get:
+		return area_radius
 	set(val):
-		area_radius = val
-		aoe_radius = val
-@export var aoe_radius: int = 0:
-	set(val):
-		aoe_radius = val
 		area_radius = val
 
 @export_group("Potency & Duration")
-@export var base_potency: float = 15.0:
+@export var base_potency: float = 15.0
+
+var base_value: float:
+	get:
+		return base_potency
 	set(val):
-		base_potency = val
-		base_value = val
-@export var base_value: float = 15.0:
-	set(val):
-		base_value = val
 		base_potency = val
 
 @export var duration_turns: int = 0
 @export var bonus_vs_undead_mult: float = 1.0
-@export var armor_penetration: float = 0.0:
+@export var armor_penetration: float = 0.0
+
+var armor_penetration_ratio: float:
+	get:
+		return armor_penetration
 	set(val):
-		armor_penetration = val
-		armor_penetration_ratio = val
-@export var armor_penetration_ratio: float = 0.0:
-	set(val):
-		armor_penetration_ratio = val
 		armor_penetration = val
 
 @export_group("Visuals & Audio")

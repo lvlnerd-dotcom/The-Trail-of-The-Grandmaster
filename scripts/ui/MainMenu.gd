@@ -46,7 +46,7 @@ func _ready() -> void:
 	if gm and gm.open_creation_on_main_menu:
 		gm.open_creation_on_main_menu = false
 		if character_creation_modal:
-			character_creation_modal.open_modal()
+			character_creation_modal.call("open_modal")
 
 func _check_saved_run() -> void:
 	var gm = _get_game_mgr()

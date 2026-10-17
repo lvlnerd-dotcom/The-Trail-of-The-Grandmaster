@@ -22,6 +22,7 @@ var current_filter: int = -1 # -1 = ALL, or ClassData.Archetype enum
 var selected_class: ClassData = null
 
 func _ready() -> void:
+    BaseModal.apply_opaque_styling(self)
     visible = false
     if btn_confirm:
         btn_confirm.pressed.connect(_on_confirm_pressed)

@@ -18,11 +18,11 @@ class Room:
         rect = p_rect
 
 # Generator Configuration
-var width: int = 48
-var height: int = 36
+var width: int = 80
+var height: int = 60
 var min_room_size: int = 5
-var max_room_size: int = 10
-var max_rooms: int = 10
+var max_room_size: int = 14
+var max_rooms: int = 20
 var room_margin: int = 2
 
 # Output Data
@@ -36,7 +36,7 @@ var secret_door_data: Array[Dictionary] = [] # {cell: Vector2i, hide_rating: flo
 var trap_data: Array[Dictionary] = []        # {cell: Vector2i, hide_rating: float, trap_type: int}
 var enemy_spawn_cells: Array[Vector2i] = []
 
-func _init(p_width: int = 48, p_height: int = 36) -> void:
+func _init(p_width: int = 80, p_height: int = 60) -> void:
     width = p_width
     height = p_height
 
@@ -102,7 +102,7 @@ func generate_dungeon(grid: DungeonGrid, floor_number: int = 1, seed_val: int = 
 
 func _generate_rooms(grid: DungeonGrid) -> void:
     var attempts = 0
-    var max_attempts = 100
+    var max_attempts = 250
     
     while rooms.size() < max_rooms and attempts < max_attempts:
         attempts += 1

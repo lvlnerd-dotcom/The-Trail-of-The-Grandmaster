@@ -56,6 +56,7 @@ const CREATURE_DATABASE: Dictionary = {
 var _indexed_keys: Array[String] = []
 
 func _ready() -> void:
+	BaseModal.apply_opaque_styling(self)
 	visible = false
 	if btn_close:
 		btn_close.pressed.connect(_on_close_pressed)

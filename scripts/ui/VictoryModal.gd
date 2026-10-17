@@ -24,6 +24,7 @@ signal closed()
 @onready var btn_bestiary: Button = $VBox/ButtonContainer/BtnBestiary
 
 func _ready() -> void:
+	BaseModal.apply_opaque_styling(self)
 	visible = false
 	if btn_main_menu:
 		btn_main_menu.pressed.connect(_on_main_menu_pressed)
@@ -88,7 +89,7 @@ func open_modal(summary: Dictionary) -> void:
 		label_progress_text.text = "Maximum Rank Reached"
 
 func close_modal() -> void:
-	visible = false
+	super.close_modal()
 	emit_signal("closed")
 
 func _on_main_menu_pressed() -> void:

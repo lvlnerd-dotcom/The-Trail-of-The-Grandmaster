@@ -26,21 +26,44 @@ func _ready() -> void:
 	action_finished.connect(_on_player_action_finished)
 
 func setup_from_creation_data(data: Dictionary) -> void:
-	if data.has("attributes"):
+	if not stats:
+		stats = get_node_or_null("StatsComponent") as StatsComponent
+	if not skills:
+		skills = get_node_or_null("SkillComponent") as SkillComponent
+	if not inventory:
+		inventory = get_node_or_null("InventoryComponent") as InventoryComponent
+	if not spell_casting:
+		spell_casting = get_node_or_null("SpellCastingComponent") as SpellCastingComponent
+		
+	if data.has("attributes") and stats:
 		stats.attributes = data["attributes"]
 	
-	if data.has("selected_skills"):
+	if data.has("selected_skills") and skills:
+		# Reset all skills to 0.0 first to ensure only selected skills start at 5.0
+		for s in skills.skills.values():
+			if s is SkillData:
+				s.level = 0.0
 		for skill_id in data["selected_skills"]:
 			var skill = skills.get_skill(skill_id)
+			if not skill:
+				skill = skills.register_or_unlock_skill(skill_id, CharacterCreationData.STARTING_SKILL_INITIAL_LEVEL)
 			if skill:
 				skill.level = CharacterCreationData.STARTING_SKILL_INITIAL_LEVEL
 	
 	if data.has("starting_items"):
 		for item in data["starting_items"]:
-			if item.equip_slot != ItemData.EquipSlot.NONE and not inventory.equipped_slots.has(item.equip_slot):
-				inventory.equip_item(item)
-			else:
-				inventory.add_item(item)
+			if inventory:
+				if item.equip_slot != ItemData.EquipSlot.NONE and not inventory.equipped_slots.has(item.equip_slot):
+					inventory.equip_item(item)
+				else:
+					inventory.add_item(item)
+			
+			# Spellbooks teach their spell into player.spell_casting
+			if spell_casting:
+				if item.item_id == "spellbook_magic_missile":
+					spell_casting.learn_spell(SpellData.create_magic_missile())
+				elif item.item_id == "spellbook_minor_heal":
+					spell_casting.learn_spell(SpellData.create_minor_heal())
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_moving:

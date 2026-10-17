@@ -40,12 +40,22 @@ func remove_item(item: ItemData) -> bool:
 		return true
 	return false
 
-func equip_item(item: ItemData) -> bool:
+func equip_item(item: ItemData, target_slot: ItemData.EquipSlot = ItemData.EquipSlot.NONE) -> bool:
 	if not item or item.equip_slot == ItemData.EquipSlot.NONE:
 		return false
 	
-	var slot = item.equip_slot
+	var slot = target_slot if target_slot != ItemData.EquipSlot.NONE else item.equip_slot
 	
+	# Automatic fallback for rings (RING_1 and RING_2)
+	if slot == ItemData.EquipSlot.RING_1 or slot == ItemData.EquipSlot.RING_2:
+		if target_slot == ItemData.EquipSlot.NONE:
+			if not equipped_slots.has(ItemData.EquipSlot.RING_1):
+				slot = ItemData.EquipSlot.RING_1
+			elif not equipped_slots.has(ItemData.EquipSlot.RING_2):
+				slot = ItemData.EquipSlot.RING_2
+			else:
+				slot = ItemData.EquipSlot.RING_1
+
 	# If something already equipped in this slot, unequip it first
 	if equipped_slots.has(slot):
 		unequip_slot(slot)
@@ -54,6 +64,14 @@ func equip_item(item: ItemData) -> bool:
 	remove_item(item)
 	equipped_slots[slot] = item
 	emit_signal("item_equipped", slot, item)
+	return true
+
+func swap_backpack_items(idx_a: int, idx_b: int) -> bool:
+	if idx_a < 0 or idx_a >= items.size() or idx_b < 0 or idx_b >= items.size():
+		return false
+	var temp = items[idx_a]
+	items[idx_a] = items[idx_b]
+	items[idx_b] = temp
 	return true
 
 func unequip_slot(slot: ItemData.EquipSlot) -> ItemData:
@@ -70,6 +88,11 @@ func unequip_slot(slot: ItemData.EquipSlot) -> ItemData:
 func get_equipped_weapon() -> ItemData:
 	if equipped_slots.has(ItemData.EquipSlot.MAIN_HAND):
 		return equipped_slots[ItemData.EquipSlot.MAIN_HAND]
+	return null
+
+func get_equipped_ammo() -> ItemData:
+	if equipped_slots.has(ItemData.EquipSlot.AMMUNITION):
+		return equipped_slots[ItemData.EquipSlot.AMMUNITION]
 	return null
 
 func get_total_armor() -> int:

@@ -38,6 +38,17 @@ func setup_enemy(p_name: String, p_hp: float, p_exp: int, p_str: int = 8, p_dex:
     enemy_name = p_name
     base_kill_exp = p_exp
     
+    if not stats:
+        stats = get_node_or_null("StatsComponent") as StatsComponent
+    if not inventory:
+        inventory = get_node_or_null("InventoryComponent") as InventoryComponent
+    if not skills:
+        skills = get_node_or_null("SkillComponent") as SkillComponent
+    if not combat:
+        combat = get_node_or_null("CombatComponent") as CombatComponent
+    if not vision:
+        vision = get_node_or_null("VisionComponent") as VisionComponent
+    
     if stats and stats.attributes:
         stats.attributes.strength = p_str
         stats.attributes.dexterity = p_dex
@@ -47,7 +58,8 @@ func setup_enemy(p_name: String, p_hp: float, p_exp: int, p_str: int = 8, p_dex:
     var crude_blade = ItemData.new("crude_blade", "Crude Blade", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 2.0)
     crude_blade.base_damage_min = 2
     crude_blade.base_damage_max = 5
-    inventory.equip_item(crude_blade)
+    if inventory:
+        inventory.equip_item(crude_blade)
 
 func apply_intimidation(status_type: String, duration_turns: int) -> void:
     intimidation_status = status_type

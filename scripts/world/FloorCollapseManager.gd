@@ -26,17 +26,30 @@ func _get_event_bus() -> Node:
         return (loop as SceneTree).root.get_node_or_null("EventBus")
     return null
 
-func get_stage_for_turns(turns_left: int) -> CollapseStage:
-    if turns_left > 200:
-        return CollapseStage.STABLE
-    elif turns_left > 100:
-        return CollapseStage.TREMORS
-    elif turns_left > 25:
-        return CollapseStage.COLLAPSING
-    elif turns_left > 0:
-        return CollapseStage.IMMINENT
-    else:
+func get_stage_for_turns(turns_left: int, total_turns: int = -1) -> CollapseStage:
+    if total_turns <= 0:
+        if turns_left > 200:
+            return CollapseStage.STABLE
+        elif turns_left > 100:
+            return CollapseStage.TREMORS
+        elif turns_left > 25:
+            return CollapseStage.COLLAPSING
+        elif turns_left > 0:
+            return CollapseStage.IMMINENT
+        else:
+            return CollapseStage.COLLAPSED
+    
+    if turns_left <= 0:
         return CollapseStage.COLLAPSED
+    var ratio = float(turns_left) / float(total_turns)
+    if ratio <= 0.10:
+        return CollapseStage.IMMINENT
+    elif ratio <= 0.25:
+        return CollapseStage.COLLAPSING
+    elif ratio <= 0.50:
+        return CollapseStage.TREMORS
+    else:
+        return CollapseStage.STABLE
 
 func get_stage_name(stage: CollapseStage = current_stage) -> String:
     match stage:
@@ -48,7 +61,7 @@ func get_stage_name(stage: CollapseStage = current_stage) -> String:
         _: return "UNKNOWN"
 
 func process_turn_tick(turns_left: int, total_turns: int) -> Dictionary:
-    var new_stage = get_stage_for_turns(turns_left)
+    var new_stage = get_stage_for_turns(turns_left, total_turns)
     var stage_changed = (new_stage != current_stage)
     if stage_changed:
         current_stage = new_stage

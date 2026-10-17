@@ -3,7 +3,7 @@
 **Project Name:** Trail of the Grandmaster  
 **Engine:** Godot Engine 4.x (Forward+ / D3D12 / GDScript 2.0)  
 **Genre:** Turn-Based Grid Roguelike (Top-Down 2D, Gritty Pixel Art, Retro Synth)  
-**Document Version:** 1.7.0 (Phase 7 Final Systems Architecture Integrated)  
+**Document Version:** 1.8.0 (Character Creation, Tri-Tier Skills & Meta-Progression Overhaul Integrated)  
 **Status:** Approved Architectural Blueprint  
 
 ---
@@ -17,7 +17,7 @@
    - **Use-Based Skill Mastery (0.0 to 100.0):** Skills level through direct, contextual usage with 0.1 increments and milestone keystone perks at 25, 50, 75, and 100.
    - **Kill Experience & Core Attribute Growth:** Slaying monsters and floor bosses awards Character Experience (EXP). Reaching new character levels grants Attribute Points for the player to permanently raise their 6 core attributes (Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma), immediately cascading into increased HP, Mana, damage, stone carry weight, crit chance, and effective skill calculations.
 2. **Deterministic & Transparent Math:** Predictable combat and evasion formulas based on relative skill differentials and attribute scaling.
-3. **Organic Character Growth:** Characters begin as raw survivors defined by 4 background skills and initial attribute distribution; class specialization is earned dynamically at the conclusion of Floor 2 based on achievements, skills, and attributes.
+3. **Organic Character Growth:** Characters begin as raw survivors defined by 4 chosen starting skills (with associated starter equipment) and initial attribute distribution; class specialization is earned dynamically at the conclusion of Floor 2 based on achievements, skills, and attributes.
 4. **Relentless Environmental Pressure:** Floors are spacious and rich in secrets, but every step expends the floor collapse timer, forcing a risk-reward dilemma between deep exploration (boss vaults, shrines, merchants) and prompt descent.
 5. **Decoupled, Data-Driven Architecture:** Pure Godot 4 `Resource`-driven definitions for stats, skills, items, classes, deities, spells, companions, shops, and dungeon generation tables, ensuring rapid extensibility.
 
@@ -330,35 +330,29 @@ Skills range from `0.0` to `100.0` and represent granular proficiency.
 class_name SkillData
 extends Resource
 
+enum SkillTier {
+    STARTING,        ## Available at character creation from the first run (15 skills)
+    META,            ## Unlocked via account rank / Meta EXP; added to starting pool (5 skills)
+    CLASS_EXCLUSIVE  ## Unlocked exclusively upon Floor 2 Class Specialization (21 skills)
+}
+
 enum SkillId {
-    # Melee (Associated with STR)
-    SWORDSMANSHIP,
-    MACE_FIGHTING,
-    POLEARMS,
-    BRAWLING,
+    # Tier 1: Starting Skills (Available at Run 1)
+    SWORDSMANSHIP, MACE_FIGHTING, POLEARMS, BRAWLING,
+    MARKSMANSHIP, ARCHERY, THROWING, DODGE, PARRY,
+    STEALTH_HIDE, ARCANE_MAGIC, ALCHEMY, SCHOLARSHIP,
+    DIVINE_MAGIC, PERCEPTION,
     
-    # Ranged & Agility (Associated with DEX)
-    MARKSMANSHIP,
-    ARCHERY,
-    THROWING,
-    DODGE,
-    PARRY,
-    STEALTH_HIDE,
+    # Tier 2: Meta Skills (Unlocked via Account Rank in MetaProfileData)
+    MEDITATION, BEAST_MASTERY, INTIMIDATION, LEADERSHIP, SURVIVALISM,
     
-    # Intellectual & Arcane (Associated with INT)
-    ARCANE_MAGIC,
-    ALCHEMY,
-    SCHOLARSHIP,
-    
-    # Spiritual & Perception (Associated with WIS)
-    DIVINE_MAGIC,
-    PERCEPTION,
-    MEDITATION,
-    
-    # Social & Leadership (Associated with CHA)
-    INTIMIDATION,
-    LEADERSHIP,
-    BEAST_MASTERY
+    # Tier 3: Class-Exclusive Skills (Unlocked on Floor 2 Class Specialization)
+    SHIELD_FORTIFICATION, PAIN_HARNESSING, RIPOSTE_FINESSE, WEAPON_SYNTHESIS,
+    ASSASSINATION, BALLISTICS, GUN_KATA, UMBRAL_PHASING,
+    PYROMANCY, SPELL_FORGING, TEMPORAL_WARPING, NECROMANTIC_SIPHON,
+    HOLY_SMITING, SACRED_BULWARK, WITCH_PURGING, DIVINE_MIRACLES,
+    ASTRAL_BLADE, TOXICOLOGY, KI_STRIKES, GRANDMASTER_SYNTHESIS,
+    IMPROVISED_SURVIVAL
 }
 
 @export var skill_id: SkillId
@@ -1229,7 +1223,7 @@ graph TD
     subgraph Meta-Progression Subsystem
         MetaSync --> ProfileFile[user://meta/profile.json]
         ProfileFile --> AccountEXP[Account Rank Curve]
-        AccountEXP --> UnlockedBG[Unlocked Backgrounds]
+        AccountEXP --> UnlockedMetaSkills[Unlocked Meta Skills in Starting Pool]
         AccountEXP --> UnlockedSkills[Expanded Starting Skills]
         CompileSummary --> Bestiary[Bestiary Codex Tier Progression]
         CompileSummary --> Achievements[Cross-Run Achievement Registry]
@@ -1802,10 +1796,9 @@ The account profile persists across all runs on the local machine:
   "total_floors_cleared": 48,
   "total_enemies_slain": 312,
   "total_turns_survived": 4820,
-  "unlocked_backgrounds": [
-    "novice_survivor",
-    "veteran_mercenary",
-    "shadow_syndicate"
+  "unlocked_meta_skills": [
+    "MEDITATION",
+    "BEAST_MASTERY"
   ],
   "unlocked_starting_skills": [
     "SWORDSMANSHIP", "MACE_FIGHTING", "POLEARMS", "BRAWLING",
@@ -1864,14 +1857,15 @@ The account profile persists across all runs on the local machine:
    - Rank 10: $6324$ EXP
 
 3. **Rank Milestone Unlocks:**
-   - **Rank 2:** Unlocks **Veteran Mercenary** Background (+2 STR, +2 CON, starts with Iron Broadsword & Chainmail).
-   - **Rank 3:** Unlocks **Shadow Syndicate** Background (+3 DEX, starts with Throwing Daggers & Chameleon Mantle).
-   - **Rank 4:** Expands character creation pool: adds **Beast Mastery** and **Meditation** as selectable starting skills.
-   - **Rank 5:** Unlocks **Royal Arcanist** Background (+3 INT, starts with Arcane Catalyst & Mana Potion).
-   - **Rank 6:** Unlocks **Temple Inquisitor** Background (+2 WIS, +1 DEX, starts with Service 9mm Pistol & Smite Scroll).
-   - **Rank 7:** Expands character creation pool: adds **Intimidation** and **Leadership** as selectable starting skills.
-   - **Rank 8:** Starting gold bonus (+50 Gold on Floor 1).
-   - **Rank 10:** Unlocks **Grandmaster Initiate** Background (Omni +1 to all 6 attributes) and player title `"Grandmaster"`.
+   - **Rank 2:** Unlocks Meta Skill **Meditation** (WIS) $\rightarrow$ added to Character Creation starting skill pool. Starting gold +25.
+   - **Rank 3:** Unlocks Meta Skill **Beast Mastery** (CHA) $\rightarrow$ added to Character Creation starting skill pool.
+   - **Rank 4:** Unlocks Class Specialization Reroll Token (allows rerolling eligible class choices at Floor 2).
+   - **Rank 5:** Unlocks Meta Skill **Intimidation** (CHA) $\rightarrow$ added to Character Creation starting skill pool.
+   - **Rank 6:** Unlocks Meta Skill **Leadership** (CHA) $\rightarrow$ added to Character Creation starting skill pool.
+   - **Rank 7:** Starting gold bonus (+50 Gold on Floor 1).
+   - **Rank 8:** Unlocks Meta Skill **Survivalism** (CON) $\rightarrow$ added to Character Creation starting skill pool.
+   - **Rank 9:** Field Medicine Mastery (Field Trauma Medpacks restore +20% HP).
+   - **Rank 10:** Grandmaster's Blessing (Omni +1 to all 6 attributes permanently at run start) and player title `"Grandmaster"`.
 
 ---
 
@@ -1891,12 +1885,12 @@ Enemies slain across all runs contribute to persistent bestiary codex entries.
 | :--- | :--- | :--- | :--- |
 | `FIRST_BLOOD` | First Blood | Slay 1st enemy in any run | Unlocks "Brawler" starter perk |
 | `FLOOR_2_SURVIVOR` | Initiate Trial Complete | Reach Floor 3 (Complete Floor 2 Specialization) | Unlocks Class Specialization Reroll Token |
-| `FLOOR_5_SURVIVOR` | Deep Delver | Reach Floor 6 | Unlocks "Veteran Mercenary" Background |
-| `FLOOR_10_SURVIVOR`| Abyss Walker | Reach Floor 11 | Unlocks "Royal Arcanist" Background |
-| `GRANDMASTER_FIRST`| Touch of Mastery | Reach 100.0 in any skill | Unlocks "Grandmaster Initiate" Background |
-| `UNTOUCHABLE` | Flawless Footwork | Clear Floor 1 without taking damage | Unlocks "Duelist" Background |
+| `FLOOR_5_SURVIVOR` | Deep Delver | Reach Floor 6 | Unlocks "Iron Will" starter relic |
+| `FLOOR_10_SURVIVOR`| Abyss Walker | Reach Floor 11 | Unlocks "Arcane Siphon" starter focus |
+| `GRANDMASTER_FIRST`| Touch of Mastery | Reach 100.0 in any skill | Unlocks "Mastery Signet" (+5% all XP) |
+| `UNTOUCHABLE` | Flawless Footwork | Clear Floor 1 without taking damage | Unlocks "Evasive Stride" starter perk |
 | `SPEED_RUNNER` | Defier of Time | Clear Floor 2 with >500 turns remaining | Unlocks "Chronomancer" starter perk |
-| `DEITY_DEVOTEE` | Faithful Servant | Reach Floor 5 with an active deity covenant | Unlocks "Zealot" Background |
+| `DEITY_DEVOTEE` | Faithful Servant | Reach Floor 5 with an active deity covenant | Unlocks "Zealot's Censer" (+10% blessing bonus) |
 | `PACIFIST_RUNNER` | Silent Ghost | Reach Floor 2 stairs without killing any enemy | Unlocks "Chameleon Mantle" relic in starter options |
 | `HOARDER` | Wealth of the Depths | Accumulate 500 gold in a single run | Unlocks +50 Starting Gold bonus |
 
@@ -2010,6 +2004,483 @@ res://
         ├── class_grandmaster_initiate.tres
         └── class_adventurer.tres
 ```
+
+---
+
+## 14. Phase 8 Architectural Specification: Character Creation Overhaul, Tri-Tier Skill Taxonomy, and Meta-Progression Architecture
+
+This section articulates the complete architectural specification for the major overhaul of Character Creation, the Tri-Tier Skill Taxonomy, Starting Equipment mappings, and Meta-Progression reward loops in *Trail of the Grandmaster*.
+
+```mermaid
+graph TD
+    subgraph Meta-Progression Loop
+        MetaProf[MetaProfileData: user://meta/profile.json] -->|Account Rank Up| UnlockMeta[Unlock Meta Skills]
+        UnlockMeta --> StartingPool[Available Starting Skill Pool]
+    end
+
+    subgraph Character Creation Subsystem
+        StartingPool --> Modal[CharacterCreationModal UI]
+        Modal --> AttrAlloc[20-Point Attribute Allocator]
+        Modal --> ChipGrid[Interactive Multi-Select 4-Skill Chips Grid]
+        Modal --> LiveCounter[Selection Counter: X / 4]
+        Modal --> LoadoutPreview[Real-Time Starter Equipment Preview]
+        Modal --> DerivedVitals[Dynamic Derived Vitals Sheet]
+        Modal -->|Embark Confirmed| CCD[CharacterCreationData Validation]
+        CCD -->|Level 5.0 Initial| PlayerSkills[Player SkillComponent: 4 Skills @ 5.0, Rest @ 0.0]
+        CCD -->|Equip First, Stash Rest| PlayerInv[Player InventoryComponent: Weapons, Armor, Foci, Ammo]
+    end
+
+    subgraph Floor 2 Gateway & Class-Exclusive Skills
+        PlayerSkills --> WorldDescent[Floor 2 Descent Gateway]
+        WorldDescent --> ClassModal[ClassSelectionModal UI]
+        ClassModal -->|Class Confirmed| ClassDataRes[ClassData: exclusive_skill_id]
+        ClassDataRes -->|Activate @ Level 5.0| ExclusiveSkill[SkillComponent: Unlock Class-Exclusive Skill]
+    end
+```
+
+---
+
+### 14.1. Architectural Philosophy & Executive Redesign
+
+#### 14.1.1. Elimination of Background Packages
+Previously, characters selected a pre-packaged "Background" (e.g. *Veteran Mercenary*, *Shadow Syndicate*, *Royal Arcanist*) from a dropdown menu. Backgrounds awarded rigid packages of bonus attributes, predefined skills, and fixed equipment. This created three core architectural friction points:
+1. **Thematic Redundancy:** Background archetypes conflicted directly with the dynamic post-Floor 2 Class Specialization gateway, where characters earned their true class identity through gameplay.
+2. **Artificial Build Railroading:** Rigid attribute bundles restricted creative cross-training and organic build discovery.
+3. **Menu Clutter:** A dropdown list hid starting gear and mechanical consequences behind generic lore blurbs.
+
+**Under the new architecture, Backgrounds are 100% eliminated.**
+- No background definitions, packages, dropdowns, bonus attributes, or profile arrays exist anywhere in the engine.
+- Every character begins as a blank-slate survivor whose foundational capabilities are defined purely by **attribute allocation** and **starting skill selection**.
+
+#### 14.1.2. The Modular 4-Skill Starting Draft
+Instead of backgrounds, players directly choose **exactly 4 starting skills** during Character Creation from the pool of available starting and unlocked meta skills:
+1. **Initial Mastery Boost:** Each of the 4 chosen skills starts at **level 5.0** (out of 100.0).
+2. **Dedicated Starter Equipment:** Each chosen skill immediately awards functional starter equipment (weapons, shields, light armor, spellbooks, ammo, focuses, and medical gear).
+3. **Organic Run Growth:** All other standard starting skills initialize at **level 0.0**. The player can train any of them organically throughout the run through direct, contextual usage.
+4. **Sealed Class Exclusives:** Class-exclusive skills are strictly barred from character creation. They cannot be chosen and cannot be trained by unspecialized adventurers.
+
+---
+
+### 14.2. Tri-Tier Skill Taxonomy Architecture (`SkillData.gd`)
+
+Skills are classified into three immutable tiers defining when and how they are acquired:
+
+```gdscript
+enum SkillTier {
+    STARTING,        ## Available at character creation from the first run (15 skills)
+    META,            ## Unlocked via account rank / Meta EXP; added to starting pool (5 skills)
+    CLASS_EXCLUSIVE  ## Unlocked exclusively upon Floor 2 Class Specialization (21 skills)
+}
+```
+
+```mermaid
+classDiagram
+    class SkillTier {
+        <<enumeration>>
+        STARTING
+        META
+        CLASS_EXCLUSIVE
+    }
+    
+    class SkillData {
+        +SkillId skill_id
+        +String skill_name
+        +SkillTier tier
+        +String associated_attribute_name
+        +String exclusive_class_id
+        +float level
+        +float current_xp
+        +Array~int~ unlocked_keystones
+        +get_effective_level(attr_value) float
+        +add_usage_attempt(difficulty, attr_val, mult) bool
+        +check_keystones() Array~int~
+        +static get_skills_by_tier(tier) Array~SkillId~
+        +static get_tier_for_skill(skill_id) SkillTier
+        +static get_associated_attribute(skill_id) String
+        +static get_exclusive_class_id(skill_id) String
+    }
+
+    SkillData --> SkillTier
+```
+
+#### 14.2.1. Tier 1: Starting Skills (`SkillTier.STARTING`)
+Available at Character Creation from the very first run. If chosen at creation, they start at level 5.0 and grant starter gear; if not chosen, they start at 0.0 and are available for organic in-run training.
+
+| Skill ID | Skill Name | Attribute | Core Combat / Delving Role | Keystone Focus (25 / 50 / 75 / 100) |
+| :--- | :--- | :--- | :--- | :--- |
+| `SWORDSMANSHIP` | Swordsmanship | Strength | Edge melee combat; slashing strikes, bleeding cuts | Bleed duration, armor puncture, counter-slashes, vorpal edge |
+| `MACE_FIGHTING` | Mace Fighting | Strength | Blunt melee combat; armor crushing, heavy stagger | Stun rolls, concussive knockdown, armor shatter, bone breaker |
+| `POLEARMS` | Polearms | Strength | 2-tile reach melee combat; spacing and interception | Impale, keep-away sweep, reach counter, titan piercer |
+| `BRAWLING` | Brawling | Strength | Unarmed combat; rapid combination strikes | Disarm, rapid jab combo, concussion stun, iron fist |
+| `ARCHERY` | Archery | Dexterity | Bows; long-range trajectory, pinning, kiting | Pinning arrow, distance damage bonus, volley shot, phantom arrow |
+| `THROWING` | Throwing | Dexterity | Thrown blades, shurikens, and alchemical flasks | Multi-throw, return ricochet, crippling throw, lethal velocity |
+| `DODGE` | Dodge | Dexterity | Active evasion; complete damage nullification | Agility step, counter-dash, evasion momentum, ghost evasion |
+| `PARRY` | Parry | Dexterity | Active weapon/shield deflection; opening counters | Deflection stance, disarming block, riposte opening, bulwark wall |
+| `STEALTH_HIDE` | Stealth | Dexterity | Line-of-sight breaking, hiding, sneak attacks | Shadow blending, silent step, backstab multiplier, vanish |
+| `ARCANE_MAGIC` | Arcane Magic | Intelligence| Planar sorcery; force, fire, teleportation, wards | Fizzle nullification, weave resonance, mana efficiency, archmage |
+| `ALCHEMY` | Alchemy | Intelligence| Concoctions, medpack brewing, poison application | Potion potency, toxin duration, volatile splash, philosopher stone |
+| `SCHOLARSHIP` | Scholarship | Intelligence| Artifact lore, spell scroll amplification, mana economy | Scroll power, item identification, mana preservation, eldritch study|
+| `DIVINE_MAGIC` | Divine Magic | Wisdom | Sacred prayers; radiant smite, healing, purification | Undead bane, overheal shield, divine aura, avatar of grace |
+| `PERCEPTION` | Perception | Wisdom | Trap detection, secret door discovery, darkness vision | Trap sense, hidden door reveal, night optics, sixth sense |
+
+#### 14.2.2. Tier 2: Meta Skills (`SkillTier.META`)
+Locked at Account Rank 1. Unlocked across runs by accumulating Meta EXP. Once unlocked in `MetaProfileData.gd`, they permanently join the Character Creation pool (selectable at 5.0 with starter gear) and become trainable from 0.0 in-run.
+
+| Skill ID | Skill Name | Attribute | Unlock Condition | Mechanical Role & Keystone Focus |
+| :--- | :--- | :--- | :--- | :--- |
+| `MEDITATION` | Meditation | Wisdom | Account Rank 2 | Passive Mana regeneration per turn; mental clarity resisting Confusion and Terror ailments. |
+| `BEAST_MASTERY` | Beast Mastery | Charisma | Account Rank 3 | Companion & warhound stat scaling bonuses; predator scent warning reveals hidden enemies. |
+| `INTIMIDATION` | Intimidation | Charisma | Account Rank 5 | Morale checks triggered by player critical hits/kills; forces hostiles into Terrified or Hesitant status. |
+| `LEADERSHIP` | Leadership | Charisma | Account Rank 6 | Coordinates allied companions; grants adjacent allies accuracy and armor auras, boosts mercenary morale. |
+| `SURVIVALISM` | Survivalism | Constitution | Account Rank 8 | Structural fissure detection; conserves floor turn clock, mitigates hazard/trap damage. |
+
+#### 14.2.3. Tier 3: Class-Exclusive Skills (`SkillTier.CLASS_EXCLUSIVE`)
+Skills strictly sealed from Character Creation and unspecialized adventurers. Unlocked exclusively upon choosing a specialization at the conclusion of Floor 2. Starts at level 5.0 immediately upon class selection.
+
+| Skill ID | Associated Class | Class Archetype | Primary Stat | Core Mechanical Specialization |
+| :--- | :--- | :--- | :--- | :--- |
+| `SHIELD_FORTIFICATION` | Knight (`class_knight`) | MARTIAL | Strength / Constitution | Active shield bulwark; deflects 30% damage back to attacker, +25% armor soak. |
+| `PAIN_HARNESSING` | Berserker (`class_berserker`) | MARTIAL | Strength / Constitution | Converts lost HP into escalating melee damage bonus; pain immunity prevents stun. |
+| `RIPOSTE_FINESSE` | Duelist (`class_duelist`) | MARTIAL | Dexterity / Strength | Guarantees instant counter-strike upon dodging or parrying; +50% counter crit chance. |
+| `WEAPON_SYNTHESIS` | Weapon Master (`class_weapon_master`)| MARTIAL | Strength / Dexterity | Instant zero-cost weapon swapping; grants cross-weapon perks (bleed, stun, reach). |
+| `ASSASSINATION` | Assassin (`class_assassin`) | RANGED_ROGUE | Dexterity / Intelligence | Multi-tier critical scaling from stealth; vital organ hits execute targets under 20% HP. |
+| `BALLISTICS` | Ranger (`class_ranger`) | RANGED_ROGUE | Dexterity / Wisdom | Nullifies bow distance penalties; ricochet arrows strike adjacent secondary targets. |
+| `GUN_KATA` | Gunslinger (`class_gunslinger`) | RANGED_ROGUE | Dexterity / Intelligence | Point-blank firearm accuracy; zero-turn slide reloads every 4 turns; staggered shots. |
+| `UMBRAL_PHASING` | Shadow Stalker (`class_shadow_stalker`)| RANGED_ROGUE | Dexterity / Wisdom | Movement through solid shadows; grants 2 turns of invisibility on dark tiles. |
+| `PYROMANCY` | Elementalist (`class_elementalist`) | ARCANE | Intelligence / Dexterity | Elemental resonance buildup; expands spell AoE radiuses by +1 tile; persistent burn decals. |
+| `SPELL_FORGING` | Battlemage (`class_battlemage`) | ARCANE | Intelligence / Strength | Deducts 35% incoming physical damage from Mana; imbues heavy blade strikes with force magic.|
+| `TEMPORAL_WARPING` | Chronomancer (`class_chronomancer`)| ARCANE | Intelligence / Wisdom | Halts floor collapse turn clock 1 turn every 8 turns; grants 2 uncontested turns on Time Freeze.|
+| `NECROMANTIC_SIPHON` | Necromancer (`class_necromancer`)| ARCANE | Intelligence / Constitution | Soul essence harvesting on enemy death; restores 10% Mana and summons skeleton thralls. |
+| `HOLY_SMITING` | Paladin (`class_paladin`) | DIVINE | Strength / Wisdom | Melee strikes deal +30% Radiant damage (doubled vs Undead/Demons); consecrates ground. |
+| `SACRED_BULWARK` | Templar (`class_templar`) | DIVINE | Constitution / Wisdom | 50% spell soak while shield equipped; total immunity to deity taboos, terror, and curses. |
+| `WITCH_PURGING` | Inquisitor (`class_inquisitor`) | DIVINE | Wisdom / Dexterity | Ranged attacks silence enemy spellcasters for 3 turns; brands occult foes through fog of war. |
+| `DIVINE_MIRACLES` | High Priest (`class_high_priest`)| DIVINE | Wisdom / Charisma | Healing spells overheal into temporary divine ward shields; cheat-death once per floor. |
+| `ASTRAL_BLADE` | Spellblade (`class_spellblade`) | HYBRID | Dexterity / Intelligence | Spells imbue weapon with elemental force for 3 turns; melee hits reduce spell cooldowns. |
+| `TOXICOLOGY` | Witch Hunter (`class_witch_hunter`)| HYBRID | Intelligence / Dexterity | Permanent virulent weapon poison (5 dmg/turn + armor shred); 100% floor trap immunity. |
+| `KI_STRIKES` | Monk (`class_monk`) | HYBRID | Dexterity / Wisdom | Unarmed damage scales directly with (DEX + WIS); dodging restores 5 Mana; concussive palm blasts.|
+| `GRANDMASTER_SYNTHESIS`| Grandmaster Initiate (`class_grandmaster_initiate`)| HYBRID | Universal (All Attrs) | Milestone resonance: reaching 25/50/75 in any skill grants +0.5 levels to all other skills. |
+| `IMPROVISED_SURVIVAL` | Adventurer / Vagabond (`class_adventurer`)| FALLBACK | Universal / Any | Scavenger resilience (+25% gold/ammo); free Second Wind restores 25 HP and clears slows. |
+
+---
+
+### 14.3. Character Creation Data Architecture & Starting Equipment Mapping (`CharacterCreationData.gd`)
+
+#### 14.3.1. Rules & Constraints Schema
+```gdscript
+class_name CharacterCreationData
+extends RefCounted
+
+const STARTING_ATTRIBUTE_POINTS: int = 20
+const MIN_ATTRIBUTE_VALUE: int = 1
+const MAX_STARTING_ATTRIBUTE_CAP: int = 10
+const REQUIRED_STARTING_SKILLS_COUNT: int = 4
+const STARTING_SKILL_INITIAL_LEVEL: float = 5.0
+```
+
+#### 14.3.2. Complete Starting Item Mapping Table
+Every selectable starting and meta skill is mapped to dedicated starting equipment:
+
+| Skill | Tier | Item ID | Item Name | Item Type | Equip Slot | Weight (Stones) | Granted Stats & Properties |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| **Swordsmanship** | STARTING | `sword_iron` | Iron Shortsword | WEAPON | MAIN_HAND | 2.0 | 3–8 Melee Dmg, 1H, Acc +5% |
+| **Mace Fighting** | STARTING | `mace_iron` | Flanged Mace | WEAPON | MAIN_HAND | 3.0 | 2–9 Blunt Dmg, 1H, +10% vs armor soak |
+| **Polearms** | STARTING | `spear_militia` | Militia Spear | WEAPON | MAIN_HAND | 2.5 | 3–7 Piercing Dmg, 2-tile attack reach |
+| **Brawling** | STARTING | `knuckles_spiked`| Spiked Knuckles | WEAPON | MAIN_HAND | 1.0 | 2–6 Blunt Dmg, +5% Crit chance |
+| **Archery** | STARTING | `bow_recurve` <br> `ammo_arrows` | Recurve Bow <br> Quiver of Arrows (20) | WEAPON <br> AMMO | MAIN_HAND <br> AMMUNITION | 2.0 <br> 1.0 | 3–8 Ranged Dmg, 5-tile range <br> 20 wooden arrows equipped in Ammo slot |
+| **Throwing** | STARTING | `throwing_daggers`| Dagger Pouch (10 Knives)| AMMO / WEAPON | AMMUNITION | 1.5 | 10 Throwing knives (2–6 Thrown Dmg, 4-tile range), equipped in Ammo slot |
+| **Dodge** | STARTING | `boots_leather` | Lightweight Runners | ARMOR | ACCESSORY | 1.0 | +1 Armor Soak, +5% Dodge evasion |
+| **Parry** | STARTING | `shield_buckler` | Steel Buckler | ARMOR (Shield) | OFF_HAND | 2.5 | +2 Armor Soak, +15% Parry block chance |
+| **Stealth / Hide** | STARTING | `cloak_shadow` | Chameleon Mantle | ARMOR | BODY | 1.0 | +1 Armor Soak, +15 Hide rating |
+| **Arcane Magic** | STARTING | `arcane_catalyst`<br> `spellbook_magic_missile`| Lapis Conduit Focus <br> Spellbook of Magic Missile | WEAPON <br> CONSUMABLE | MAIN_HAND <br> NONE | 1.0 <br> 1.5 | Magic Focus weapon <br> Teaches player the Magic Missile spell |
+| **Alchemy** | STARTING | `medpack_combat` <br> `potion_antidote` | Field Trauma Kit <br> Antidote Flask | CONSUMABLE <br> CONSUMABLE | NONE <br> NONE | 1.5 <br> 0.5 | Restores 40 HP <br> Cleanses poison/toxic status |
+| **Scholarship** | STARTING | `scholars_tome` | Ancient Scholar's Grimoire| RELIC | ACCESSORY | 1.5 | +15 Max Mana, -10% Spell Mana Cost |
+| **Divine Magic** | STARTING | `holy_symbol` <br> `spellbook_minor_heal` | Radiant Holy Symbol <br> Spellbook of Minor Heal | WEAPON <br> CONSUMABLE | MAIN_HAND <br> NONE | 1.0 <br> 1.5 | Divine Focus weapon <br> Teaches player the Minor Heal prayer |
+| **Perception** | STARTING | `scout_optics` | Scout Night Optics | RELIC | HEAD | 0.8 | +1 Vision radius, +15 Trap/Secret detection |
+| **Meditation** | META | `prayer_beads` | Beads of Serenity | RELIC | ACCESSORY | 0.5 | +20% Turn Mana regeneration rate |
+| **Beast Mastery** | META | `beast_whistle` | Tamer's Bone Whistle | RELIC | ACCESSORY | 0.5 | Companions/Hounds gain +10% Max HP & Damage |
+| **Intimidation** | META | `dread_pendant` | Dread Sigil Pendant | RELIC | ACCESSORY | 0.5 | +10 Intimidation Morale DC check on crits |
+| **Leadership** | META | `command_badge` | Commander's Tactical Badge| RELIC | ACCESSORY | 0.5 | Adjacent allies gain +15% Hit chance & +2 Armor |
+| **Survivalism** | META | `survival_kit` | Delver's Field Kit | CONSUMABLE | NONE | 1.5 | Restores 20 HP & 10 Mana; reveals hazards |
+
+#### 14.3.3. Equipment Slot Assignment & Conflict Resolution Algorithm
+When resolving starting items from the 4 selected skills:
+1. Initialize an empty equipped table `equipped_slots = {}` and an empty backpack list `backpack_items = []`.
+2. Iterate through each item granted by the chosen skills in selection order:
+   - If `item.equip_slot != EquipSlot.NONE` and `not equipped_slots.has(item.equip_slot)`:
+     - Item is equipped: `equipped_slots[item.equip_slot] = item`.
+   - Else:
+     - Item is placed in backpack: `backpack_items.append(item)`.
+3. **Weight Burden Calculation:**
+   Equipped items do not add to carry burden per core GDD specification:
+   $$\text{StartingBurden} = \sum_{it \in \text{backpack\_items}} it.\text{weight\_stones}$$
+   $$\text{MaxCarryWeight} = \text{strength} \times 10.0\text{ stones}$$
+   - *Burden Safety Guarantee:* The absolute maximum possible starting backpack weight occurs when selecting 4 heavy-weapon skills simultaneously (e.g. Mace + Spear + Gun + Bow), generating $3.0 + 2.5 + 2.5 + 2.5 = 10.5$ stones. Since minimum Strength allocation is $1$ (10 stones capacity) and typical starting Strength is $4 - 8$ ($40 - 80$ stones capacity), **the starting character is mathematically guaranteed to never begin overburdened.**
+
+---
+
+### 14.4. User Interface Architecture: Multi-Select Skill Picker & Chips Grid (`CharacterCreationModal.tscn` / `CharacterCreationModal.gd`)
+
+#### 14.4.1. Complete Scene Tree Structure
+```
+CharacterCreationModal (PanelContainer - res://scenes/ui/menus/CharacterCreationModal.tscn)
+└── VBox (VBoxContainer - separation: 8px)
+    ├── HeaderBox (VBoxContainer)
+    │   ├── LabelTitle ("EXPEDITION PREPARATION — CHARACTER CREATION")
+    │   └── LabelPointsRemaining ("Attribute Points Remaining: 20")
+    ├── HSeparator1 (HSeparator)
+    ├── MainSplit (HSplitContainer - split_offset: 360)
+    │   ├── LeftPane: Attributes & Baseline Vitals (VBoxContainer)
+    │   │   ├── SectionHeaderAttrs (Label: "1. DISTRIBUTE ATTRIBUTES (20 PTS)")
+    │   │   ├── StatsGrid (GridContainer - columns: 4)
+    │   │   │   ├── [LblStr, BtnStrMinus, ValStr, BtnStrPlus]
+    │   │   │   ├── [LblDex, BtnDexMinus, ValDex, BtnDexPlus]
+    │   │   │   ├── [LblCon, BtnConMinus, ValCon, BtnConPlus]
+    │   │   │   ├── [LblInt, BtnIntMinus, ValInt, BtnIntPlus]
+    │   │   │   ├── [LblWis, BtnWisMinus, ValWis, BtnWisPlus]
+    │   │   │   └── [LblCha, BtnChaMinus, ValCha, BtnChaPlus]
+    │   │   ├── HSeparatorSub (HSeparator)
+    │   │   └── DerivedBox (VBoxContainer)
+    │   │       ├── LabelDerivedHeader (Label: "Projected Baseline Vitals:")
+    │   │       └── GridDerived (GridContainer - columns: 5)
+    │   │           ├── [LblHP, LblMana, LblCarry, LblMelee, LblCrit]
+    │   │           └── [ValHP, ValMana, ValCarry, ValMelee, ValCrit]
+    │   └── RightPane: Starting Skills Picker (VBoxContainer)
+    │       ├── SkillHeaderHBox (HBoxContainer)
+    │       │   ├── LabelSkillsTitle (Label: "2. SELECT 4 STARTING SKILLS")
+    │       │   └── LabelSkillsCounter (Label: "Selected: 0 / 4" - Dynamic Color)
+    │       ├── ScrollSkillChips (ScrollContainer - custom_min_height: 240px)
+    │       │   └── SkillChipsGrid (GridContainer - columns: 3 - separation: 6px)
+    │       │       └── [Dynamic SkillChipButton instances...]
+    │       ├── HSeparatorLoadout (HSeparator)
+    │       └── LoadoutPreviewBox (PanelContainer)
+    │           └── VBoxLoadout (VBoxContainer)
+    │               ├── LabelLoadoutHeader (Label: "Granted Starter Equipment:")
+    │               └── LabelLoadoutItems (Label: autowrap, color-coded item list)
+    ├── HSeparator2 (HSeparator)
+    └── ButtonsBox (HBoxContainer - alignment: Center - separation: 16px)
+        ├── BtnEmbark (Button: "Embark on Expedition" - Disabled until valid)
+        ├── BtnReset (Button: "Reset Defaults")
+        └── BtnCancel (Button: "Back to Title")
+```
+
+#### 14.4.2. Skill Chip Anatomy & Interaction States
+Each skill chip in `SkillChipsGrid` is instantiated from a lightweight button control:
+- **Visual Anatomy:**
+  - Skill Title (Bold, e.g. `"Swordsmanship"`).
+  - Attribute Pill (e.g. `[STR]`, `[DEX]`, `[INT]`, `[WIS]`, `[CHA]`).
+  - Meta Pill (`[META]` rendered in shimmering amber if the skill was unlocked via account rank).
+  - Mouseover Tooltip: Details skill mechanics and exact granted starter gear (e.g. `"[Swordsmanship]\nGrants: Iron Shortsword (1H Melee, 3-8 Dmg)\nStarts at Level 5.0"`).
+- **Interaction State Machine:**
+  - **UNSELECTED:** Background `#252830`, Border `#3E4452` (1px), Text `#C0C6D0`.
+  - **SELECTED:** Background `#163E24`, Border `#2ECC71` (2px glow), Text `#FFFFFF`. Selection checkmark icon visible.
+  - **DISABLED / BLOCKED:** When `selected_skills.size() == 4`, unselected chips dim to `#181A20` with Text `#606470`. Clicking plays an audio blip and updates status hint: `"Maximum 4 skills selected. Deselect one first."`
+- **Dynamic Selection Counter (`LabelSkillsCounter`):**
+  - Count $< 4$: Amber text (`#F1C40F`, `"Selected: %d / 4 (Pick %d more)"`).
+  - Count $== 4$: Emerald text (`#2ECC71`, `"Selected: 4 / 4 [COMPLETE]"`).
+- **Real-Time Loadout Preview:**
+  - Toggling any skill updates `LabelLoadoutItems` immediately by querying `CharacterCreationData.get_starting_items_for_skills(selected_skills)`:
+    `"Equipped: Iron Shortsword (Main Hand), Steel Buckler (Off Hand) | Backpack: 9mm Pistol, Ammo Box (12 Rds) [Total Weight: 2.5 Stones]"`
+
+#### 14.4.3. Embark Button Activation Validation
+`BtnEmbark.disabled` is bound dynamically:
+```gdscript
+var can_embark: bool = (get_remaining_points() == 0) and (selected_skills.size() == REQUIRED_STARTING_SKILLS_COUNT)
+btn_embark.disabled = not can_embark
+```
+
+---
+
+### 14.5. Class Specialization Integration (`ClassData.gd`, `ClassCatalog.gd`, `SkillComponent.gd`)
+
+#### 14.5.1. Floor 2 Specialization Gateway Sequence
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player
+    participant Stairs as StairsDown
+    participant World as World
+    participant Modal as ClassSelectionModal
+    participant ClassCatalog as ClassCatalog
+    participant PlayerEntity as Player (BaseEntity)
+    participant Skills as SkillComponent
+    participant GM as GameManager
+
+    Player->>Stairs: Steps onto StairsDown tile on Floor 2
+    Stairs->>World: emit_signal("descent_requested", 3)
+    World->>PlayerEntity: has_meta("class_id")?
+    alt Unspecialized Adventurer
+        World->>Modal: open_modal(player)
+        Modal->>ClassCatalog: get_all_classes()
+        Modal->>Modal: Evaluate eligibility (AptitudeScore >= 25.0 or Hard Reqs)
+        Modal->>Player: Present eligible class cards & exclusive skills
+        Player->>Modal: Selects Class (e.g. "Knight") & clicks Confirm
+        Modal->>PlayerEntity: chosen_class.apply_to_player(player)
+        Modal->>Skills: unlock_class_exclusive_skill(chosen_class.exclusive_skill_id, 5.0)
+        Skills->>Skills: Register skill @ level 5.0 & hook keystones
+        Skills-->>PlayerEntity: Floating text "[Shield Fortification] Unlocked!"
+        Modal->>GM: save_run(world) [Atomic HMAC write]
+        Modal->>World: class_chosen(chosen_class)
+        World->>World: _proceed_descent(3)
+    else Already Specialized
+        World->>World: _proceed_descent(next_floor)
+    end
+```
+
+#### 14.5.2. `SkillComponent.gd` Exclusive Skill Activation Method
+```gdscript
+func unlock_class_exclusive_skill(p_id: SkillData.SkillId, starting_level: float = 5.0) -> SkillData:
+    if skills.has(p_id):
+        return skills[p_id] # Already unlocked
+        
+    var skill_name = SkillData.get_skill_name(p_id)
+    var attr = SkillData.get_associated_attribute(p_id)
+    var class_id = SkillData.get_exclusive_class_id(p_id)
+    
+    var data = SkillData.new(p_id, skill_name, attr, starting_level)
+    data.tier = SkillData.SkillTier.CLASS_EXCLUSIVE
+    data.exclusive_class_id = class_id
+    
+    data.keystone_reached.connect(func(_id, milestone):
+        emit_signal("keystone_triggered", data, milestone)
+        var bus = _get_event_bus()
+        if bus:
+            bus.emit_signal("keystone_unlocked", data.skill_name, milestone)
+    )
+    skills[p_id] = data
+    emit_signal("skill_advanced", data, starting_level)
+    
+    var bus = _get_event_bus()
+    if bus:
+        bus.emit_signal("skill_unlocked", p_id, skill_name)
+        
+    return data
+```
+
+---
+
+### 14.6. Meta-Progression Reward Loop (`MetaProfileData.gd` & `MetaManager.gd`)
+
+#### 14.6.1. Complete 10-Rank Meta Unlock Schedule
+Meta-Progression accumulates across runs via Meta EXP, awarded upon player death or victory:
+
+$$\text{RequiredMetaEXP}(\text{Rank}) = \lfloor 200 \times \text{Rank}^{1.5} \rfloor$$
+
+| Rank | Required Meta EXP | Cumulative EXP | Unlocked Permanent Account Reward | Mechanical Effect in Character Creation / Runs |
+| :---: | :---: | :---: | :--- | :--- |
+| **1** | 0 | 0 | **Baseline Initiate** | 15 Tier 1 Starting Skills available in Character Creation. |
+| **2** | 200 | 200 | Unlocks Meta Skill **Meditation** (WIS) | Added to Character Creation pool; starts with Beads of Serenity (+20% Mana regen). Starting Gold +25. |
+| **3** | 565 | 765 | Unlocks Meta Skill **Beast Mastery** (CHA)| Added to Character Creation pool; starts with Tamer's Bone Whistle (+10% pet HP/Dmg). |
+| **4** | 1,039 | 1,804 | **Class Specialization Reroll Token** | Allows rerolling eligible specializations once per run at Floor 2 descent gateway. |
+| **5** | 1,600 | 3,404 | Unlocks Meta Skill **Intimidation** (CHA) | Added to Character Creation pool; starts with Dread Sigil Pendant (+10 Intimidation DC on crits). |
+| **6** | 2,249 | 5,653 | Unlocks Meta Skill **Leadership** (CHA) | Added to Character Creation pool; starts with Commander's Tactical Badge (+15% ally hit, +2 armor). |
+| **7** | 2,979 | 8,632 | **Expedition Treasury Boost** | Permanent starting gold bonus: all new runs start with +50 Gold on Floor 1. |
+| **8** | 3,788 | 12,420 | Unlocks Meta Skill **Survivalism** (CON) | Added to Character Creation pool; starts with Delver's Field Kit (reveals hazards, restores 20 HP/10 MP). |
+| **9** | 4,670 | 17,090 | **Field Medicine Mastery** | All Field Trauma Medpacks restore +20% HP (48 HP vs 40 HP). |
+| **10**| 5,623 | 22,713 | **Grandmaster's Blessing & Title** | All new characters permanently begin with **+1 to ALL 6 Core Attributes**; unlocks title `"Grandmaster"`. |
+
+#### 14.6.2. Profile Serialization Schema & Backward-Compatible Migration
+The account profile at `user://meta/profile.json` updates to store meta skills instead of backgrounds:
+```json
+{
+  "account_version": "1.8.0",
+  "account_rank": 3,
+  "current_meta_exp": 120,
+  "total_runs_played": 14,
+  "total_victories": 1,
+  "unlocked_meta_skills": [
+    "MEDITATION",
+    "BEAST_MASTERY"
+  ],
+  "unlocked_starting_skills": [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+  ],
+  "bestiary_records": {},
+  "unlocked_achievements": []
+}
+```
+**Migration Protocol:** If an older `profile.json` containing `unlocked_background_ids` is loaded, `MetaProfileData.from_dict()` reads the account rank, reconstructs `unlocked_meta_skills` according to the rank schedule above, and silently strips the deprecated background keys. Zero save wipe or data corruption occurs.
+
+---
+
+### 14.7. Core Mathematical Formulations & Scaling Proofs
+
+#### 14.7.1. Effective Skill Level Formula
+$$\text{EffectiveSkill} = \text{SkillLevel} + \left( \frac{\text{AttributeValue}}{2.0} \right)$$
+- At level 5.0 with 8 in associated attribute: $\text{EffectiveSkill} = 5.0 + 4.0 = 9.0$.
+- At level 0.0 with 10 in associated attribute: $\text{EffectiveSkill} = 0.0 + 5.0 = 5.0$.
+
+#### 14.7.2. Sweet-Spot Skill Advancement Formula
+$$\Delta\text{XP} = 10.0 \times \text{DifficultyWeight}(\delta) \times \left(1.0 + \max(0, \text{INT} - 10) \times 0.025\right)$$
+$$\delta = \text{TaskDifficulty} - \text{EffectiveSkill}$$
+$$\text{DifficultyWeight}(\delta) = \begin{cases} 1.0 & |\delta| \le 15.0 \quad (\text{Optimal Learning Sweet-Spot}) \\ 0.5 & 15.0 < |\delta| \le 30.0 \quad (\text{Challenging Task}) \\ 0.1 & |\delta| > 30.0 \quad (\text{Trivial or Impossible}) \end{cases}$$
+Reaching $\text{current\_xp} \ge 20.0$ increments skill level by **0.1 increments**, snapped to 1 decimal place.
+
+#### 14.7.3. Dynamic Aptitude Composite Scoring for Class Specialization
+$$\text{AptitudeScore} = \sum_{\text{attr} \in \text{ReqAttrs}} \max(0, \text{PlayerAttr} - 4) \times 2.5 + \sum_{\text{skill} \in \text{ReqSkills}} \left(\frac{\text{PlayerSkill}}{\text{ReqSkill}}\right) \times 15.0$$
+- Unlocks specialization if $\text{AptitudeScore} \ge 25.0$ AND the primary attribute meets at least $80\%$ of baseline requirement.
+
+---
+
+### 14.8. Cross-System Event Flows
+
+#### 14.8.1. Run Conclusion & Meta Reward Loop Event Flow
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player
+    participant Stats as StatsComponent
+    participant GM as GameManager
+    participant MetaMgr as MetaManager
+    participant Profile as MetaProfileData
+    participant UI as GameOverModal / VictoryModal
+
+    Player->>Stats: HP <= 0 OR Grandmaster Defeated
+    Stats->>GM: trigger_run_end(is_victory, summary)
+    GM->>GM: wipe_run_save() [Strict Permadeath Disk Wipe]
+    GM->>MetaMgr: record_run_completion(summary)
+    MetaMgr->>Profile: calculate_run_meta_exp(summary)
+    MetaMgr->>Profile: add_meta_exp(earned_exp)
+    alt Rank Promotion Occurred
+        Profile->>Profile: account_rank += 1
+        Profile->>Profile: unlock_meta_skill(rank_reward_skill)
+        Profile->>MetaMgr: emit_signal("rank_increased", new_rank, perks)
+        MetaMgr->>MetaMgr: save_meta_profile() [Atomic write profile.json]
+    end
+    GM->>UI: open_modal(summary)
+    UI->>Player: Display Epitaph / Victory, Meta EXP Bar & Newly Unlocked Meta Skills!
+```
+
+---
+
+### 14.9. Implementation Roadmap & Test Migration Strategy
+
+1. **Step 1: Data Models (`SkillData.gd`):**
+   - Declare `SkillTier` enum (`STARTING`, `META`, `CLASS_EXCLUSIVE`).
+   - Expand `SkillId` enum with all 41 skills.
+   - Add static helper methods and metadata lookups.
+2. **Step 2: Character Creation Data (`CharacterCreationData.gd`):**
+   - Eliminate `BACKGROUNDS` dictionary and `apply_background()`.
+   - Implement `get_available_starting_skills()`, querying `MetaManager`.
+   - Implement complete starting equipment mapping and conflict resolution for all 15 starting + 5 meta skills.
+   - Implement validation methods checking 20 attribute points and 4 selected skills.
+3. **Step 3: Meta-Progression (`MetaProfileData.gd` & `MetaManager.gd`):**
+   - Remove `unlocked_background_ids`.
+   - Add `unlocked_meta_skills` and implement 10-rank unlock schedule.
+   - Ensure backward-compatible serialization migration.
+4. **Step 4: Class Specialization (`ClassData.gd` & `ClassCatalog.gd`):**
+   - Associate exclusive skill IDs with all 21 classes.
+   - Update `apply_to_player()` to unlock the class-exclusive skill in `SkillComponent`.
+5. **Step 5: Skill Component (`SkillComponent.gd`):**
+   - Initialize 15 starting skills + unlocked meta skills; keep class exclusives uninitialized until specialization.
+   - Implement `unlock_class_exclusive_skill(id, level = 5.0)`.
+6. **Step 6: UI Overhaul (`CharacterCreationModal.tscn` & `.gd`):**
+   - Remove background option buttons.
+   - Build multi-select chips grid, selection counter, live loadout preview, and embark state machine.
+7. **Step 7: World & Player Integration (`World.gd` & `Player.gd`):**
+   - Pass selected 4 skills and generated equipment into `player.setup_from_creation_data()`.
+8. **Step 8: Test Suite Migration:**
+   - Update `tests/test_phase6_class_specialization_and_meta.gd` to validate starting skills, starter equipment, and meta skill unlocks without legacy background dependencies.
+
 
 ---
 
@@ -2456,7 +2927,7 @@ With the completion of **Phase 7: The Grandmaster Encounter, End-Game Victory Lo
 1. **Dual Progression Roguelike Foundation (Phases 1 & 2):** Deterministic turn loop, decimal skill leveling (0.0 to 100.0), attribute scaling, and inventory stone weight burden.
 2. **Tactical Combat & Procedural World (Phases 3 & 4):** Deterministic hit/defense formulas, combat stances, stealth perception LOS, procedural dungeon generation, and the relentless floor collapse turn-clock.
 3. **Magic, Shrines, Companions & Economy (Phase 5):** Dual-school Arcane/Divine spellcasting, deity shrines with Wisdom-scaled blessings and taboos, Charisma-scaled tactical companions, and dynamic merchant spread formulas.
-4. **Specialization & Account Meta-Progression (Phase 6):** Floor 2 exit specialization gateway with 21 distinct classes, atomic HMAC save serialization, physical permadeath disk wiping, and persistent account rank/codex unlocks.
+4. **Specialization, Character Creation & Meta-Progression (Phases 6 & 8 Overhaul):** Floor 2 exit specialization gateway with 21 distinct classes, atomic HMAC save serialization, physical permadeath disk wiping, and persistent account rank/codex unlocks.
 5. **The Grandmaster Climax & Complete Lifecycle (Phase 7):** Zero-asset procedural placeholder audio with drop-in upgrade path, 3-phase epic Grandmaster encounter, hand-crafted Floor 20 sanctum arena, seamless MainMenu-to-Victory lifecycle, camera trauma screen shake, and full regression testing.
 
 **The architecture is complete, approved, and ready for developer implementation and auditor validation.**

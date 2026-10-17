@@ -13,6 +13,7 @@ signal points_allocated()
 var player_attributes: AttributesData = null
 
 func _ready() -> void:
+    BaseModal.apply_opaque_styling(self)
     visible = false
     if btn_close:
         btn_close.pressed.connect(_on_close_pressed)
@@ -71,4 +72,4 @@ func _on_add_pressed(attr_key: String) -> void:
         emit_signal("points_allocated")
 
 func _on_close_pressed() -> void:
-    visible = false
+    close_modal()

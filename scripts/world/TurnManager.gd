@@ -36,8 +36,12 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
     init_floor_timer(1)
 
-func init_floor_timer(floor_num: int) -> void:
-    floor_total_turns = max(200, floor_turn_budget_base - (floor_num * floor_turn_budget_per_floor))
+func init_floor_timer(floor_num: int, walkable_tiles: int = -1) -> void:
+    if walkable_tiles > 0:
+        var dynamic_budget = 300 + int(walkable_tiles * 0.70) - (floor_num * 15)
+        floor_total_turns = maxi(250, dynamic_budget)
+    else:
+        floor_total_turns = max(200, floor_turn_budget_base - (floor_num * floor_turn_budget_per_floor))
     floor_turns_remaining = floor_total_turns
     turn_number = 1
     current_state = TurnState.WAITING_FOR_INPUT

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://dry0khfkbb2po"]
+[gd_scene load_steps=15 format=3 uid="uid://dry0khfkbb2po"]
 
 [ext_resource type="Script" path="res://scripts/world/World.gd" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/world/DungeonGrid.tscn" id="2_grid"]
@@ -11,6 +11,9 @@
 [ext_resource type="Script" path="res://scripts/world/DecalsLayer.gd" id="9_decals"]
 [ext_resource type="PackedScene" path="res://scenes/ui/menus/VictoryModal.tscn" id="10_victory_modal"]
 [ext_resource type="PackedScene" path="res://scenes/ui/menus/BestiaryModal.tscn" id="11_bestiary_modal"]
+[ext_resource type="PackedScene" uid="uid://inventory_modal_01" path="res://scenes/ui/menus/InventoryModal.tscn" id="12_inv_modal"]
+[ext_resource type="PackedScene" uid="uid://skills_modal_01" path="res://scenes/ui/menus/SkillsModal.tscn" id="13_skills_modal"]
+[ext_resource type="PackedScene" uid="uid://hotbar_bar_01" path="res://scenes/ui/components/HotbarBar.tscn" id="14_hotbar"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -55,7 +58,7 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.8, 0.2, 1)
 theme_override_font_sizes/font_size = 18
-text = "TRAIL OF THE GRANDMASTER  |  Phase 7: Boss Encounter & Victory Loop"
+text = "TRAIL OF THE GRANDMASTER  |  Expanded Core Delve"
 
 [node name="LabelStatus" type="Label" parent="UILayer/HUD/VBox"]
 layout_mode = 2
@@ -79,7 +82,10 @@ text = "Action: Standby."
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 12
-text = "Controls: WASD / Numpad (8-way 1-9) / Arrow Keys to move | Space / Numpad 5 / '.' to wait | Left-Click to move"
+text = "Controls: WASD/Arrows to Move | Space to Wait | 'I' Inventory | 'K' Skills | 'L' Level-Up | 1-0 Hotbar Quick Cast"
+
+[node name="HotbarBar" parent="UILayer" instance=ExtResource("14_hotbar")]
+layout_mode = 1
 
 [node name="LevelUpModal" parent="UILayer" instance=ExtResource("6_levelup")]
 visible = false
@@ -94,4 +100,10 @@ visible = false
 visible = false
 
 [node name="BestiaryModal" parent="UILayer" instance=ExtResource("11_bestiary_modal")]
+visible = false
+
+[node name="InventoryModal" parent="UILayer" instance=ExtResource("12_inv_modal")]
+visible = false
+
+[node name="SkillsModal" parent="UILayer" instance=ExtResource("13_skills_modal")]
 visible = false

@@ -21,6 +21,7 @@ signal closed()
 @onready var btn_restart: Button = $VBox/ButtonContainer/BtnRestart
 
 func _ready() -> void:
+    BaseModal.apply_opaque_styling(self)
     visible = false
     if btn_restart:
         btn_restart.pressed.connect(_on_restart_pressed)

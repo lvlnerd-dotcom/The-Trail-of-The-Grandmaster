@@ -1,5 +1,8 @@
 extends Node
 
+const SkillData = preload("res://scripts/resources/SkillData.gd")
+const MetaProfileData = preload("res://scripts/resources/MetaProfileData.gd")
+
 ## MetaManager: Autoload managing persistent cross-run account progression and unlocks.
 
 const PROFILE_DIR = "user://meta"
@@ -128,17 +131,23 @@ func unlock_achievement(achievement_id: String, title: String) -> bool:
             bus.emit_signal("meta_achievement_unlocked", achievement_id, title)
     return unlocked
 
-func is_background_unlocked(bg_id: String) -> bool:
+func is_meta_skill_unlocked(skill_key: String) -> bool:
     if not profile:
         load_profile()
-    return profile.unlocked_background_ids.has(bg_id)
+    return profile.is_meta_skill_unlocked(skill_key)
 
-func get_unlocked_backgrounds() -> Array[String]:
+func get_unlocked_meta_skills() -> Array[String]:
     if not profile:
         load_profile()
-    return profile.unlocked_background_ids
+    return profile.unlocked_meta_skills
 
 func get_starting_skills_pool() -> Array[int]:
     if not profile:
         load_profile()
-    return profile.unlocked_starting_skills
+    var pool: Array[int] = []
+    for s_id in SkillData.get_skills_by_tier(SkillData.SkillTier.STARTING):
+        pool.append(int(s_id))
+    for meta_id in SkillData.get_skills_by_tier(SkillData.SkillTier.META):
+        if profile.is_skill_unlocked(meta_id):
+            pool.append(int(meta_id))
+    return pool

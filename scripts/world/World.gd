@@ -22,6 +22,9 @@ extends Node2D
 @onready var game_over_modal: GameOverModal = $UILayer/GameOverModal
 @onready var victory_modal: VictoryModal = get_node_or_null("UILayer/VictoryModal") as VictoryModal
 @onready var bestiary_modal: BestiaryModal = get_node_or_null("UILayer/BestiaryModal") as BestiaryModal
+@onready var inventory_modal: InventoryModal = get_node_or_null("UILayer/InventoryModal") as InventoryModal
+@onready var skills_modal: SkillsModal = get_node_or_null("UILayer/SkillsModal") as SkillsModal
+@onready var hotbar_bar: HotbarBar = get_node_or_null("UILayer/HotbarBar") as HotbarBar
 @onready var decals_layer: DecalsLayer = get_node_or_null("DecalsLayer") as DecalsLayer
 
 const PLAYER_SCENE = preload("res://scenes/entities/player/Player.tscn")
@@ -39,9 +42,12 @@ var current_floor: int = 1
 var generator: DungeonGenerator = null
 var enemies_killed_count: int = 0
 var is_game_over: bool = false
+var fow_system: FogOfWarSystem = null
 
 func _ready() -> void:
-	generator = DungeonGenerator.new(46, 32)
+	fow_system = FogOfWarSystem.new()
+	add_child(fow_system)
+	generator = DungeonGenerator.new(80, 60)
 	_generate_and_setup_floor(current_floor)
 	_connect_signals()
 	if class_selection_modal:
@@ -73,7 +79,9 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 	
 	# 2. Procedural Dungeon Generation
 	var gen_result = generator.generate_dungeon(grid, floor_num)
-	grid_visualizer.setup(grid)
+	if fow_system:
+		fow_system.init_fog(grid.grid_width, grid.grid_height)
+	grid_visualizer.setup(grid, fow_system)
 	
 	# 3. Setup or relocate Player
 	if not player or not is_instance_valid(player):
@@ -110,9 +118,10 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 		if am:
 			am.play_ambient("ambient_dungeon")
 	
-	# 5. Reset Floor Turn Timer
-	turn_manager.init_floor_timer(floor_num)
+	# 5. Reset Floor Turn Timer with dynamic walkable tiles scaling
+	turn_manager.init_floor_timer(floor_num, grid.walkable_cells.size())
 	collapse_manager.current_stage = FloorCollapseManager.CollapseStage.STABLE
+	update_fog_and_cull_entities()
 
 func _spawn_grandmaster_boss(spawn_cell: Vector2i) -> void:
 	var boss = BOSS_SCENE.instantiate() as GrandmasterBoss
@@ -148,6 +157,8 @@ func _spawn_player(spawn_cell: Vector2i) -> void:
 		player.combat.floating_text_requested.connect(_on_floating_text_requested)
 	if player.stats:
 		player.stats.entity_died.connect(_on_player_died)
+	if hotbar_bar:
+		hotbar_bar.setup(player)
 
 func _spawn_stairs(exit_cell: Vector2i) -> void:
 	stairs_down = StairsDown.new()
@@ -436,6 +447,43 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					bestiary_modal.open_modal()
 			return
 
+		if key_event.keycode == KEY_I:
+			get_viewport().set_input_as_handled()
+			if inventory_modal:
+				if inventory_modal.visible:
+					inventory_modal.close_modal()
+				else:
+					inventory_modal.open_modal_with_player(player)
+			return
+
+		if key_event.keycode == KEY_K:
+			get_viewport().set_input_as_handled()
+			if skills_modal:
+				if skills_modal.visible:
+					skills_modal.close_modal()
+				else:
+					skills_modal.open_modal_with_player(player)
+			return
+
+		# Hotbar keys 1 through 9, and 0
+		var hotbar_idx = -1
+		if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
+			hotbar_idx = key_event.keycode - KEY_1
+		elif key_event.keycode == KEY_0:
+			hotbar_idx = 9
+
+		if hotbar_idx != -1 and hotbar_bar:
+			get_viewport().set_input_as_handled()
+			var res = hotbar_bar.trigger_slot(hotbar_idx)
+			if res.get("success", false):
+				label_log.text = "Hotbar: %s" % res.get("message", "Action executed.")
+				if turn_manager:
+					turn_manager.submit_player_action("hotbar_action", {"message": res.get("message", ""), "immediate_resolve": true})
+				_update_hud()
+			else:
+				label_log.text = "Hotbar: %s" % res.get("message", "Cannot trigger slot.")
+			return
+
 func _update_hud() -> void:
 	if not label_status or not player or not player.stats:
 		return
@@ -494,8 +542,24 @@ func _on_player_acted(action: String, details: Dictionary) -> void:
 	elif action == "move":
 		label_log.text = "Action: Player moved %s" % str(details.get("direction", Vector2i.ZERO))
 
+func update_fog_and_cull_entities() -> void:
+	if not fow_system or not player or not is_instance_valid(player):
+		return
+	var sight_radius = 8
+	if player.vision:
+		sight_radius = player.vision.view_distance_tiles
+	fow_system.update_visibility(player.grid_pos, sight_radius, grid)
+	if grid_visualizer:
+		grid_visualizer.queue_redraw()
+	
+	for e in enemies:
+		if is_instance_valid(e):
+			e.visible = fow_system.is_visible(e.grid_pos)
+
 func _on_entity_moved(entity: Node2D, _from_cell: Vector2i, to_cell: Vector2i) -> void:
 	if entity == player:
+		update_fog_and_cull_entities()
+		
 		# 1. Check if stepped on Stairs Down
 		if stairs_down and stairs_down.can_descend(player):
 			stairs_down.trigger_descent()
@@ -516,6 +580,9 @@ func _on_entity_moved(entity: Node2D, _from_cell: Vector2i, to_cell: Vector2i) -
 					
 		# 3. Perform Perception Scan on nearby hidden objects
 		_scan_environment_with_perception()
+	elif enemies.has(entity):
+		if fow_system:
+			entity.visible = fow_system.is_visible(to_cell)
 
 func _scan_environment_with_perception() -> void:
 	if not player or not player.vision or not player.skills:
@@ -528,7 +595,7 @@ func _scan_environment_with_perception() -> void:
 		if not door.is_revealed:
 			var dist = abs(door.grid_pos.x - p_pos.x) + abs(door.grid_pos.y - p_pos.y)
 			if dist <= player.vision.view_distance_tiles:
-				if player.vision.has_line_of_sight(grid, p_pos, door.grid_pos):
+				if VisionComponent.has_line_of_sight(grid, p_pos, door.grid_pos):
 					var det_chance = VisionComponent.calculate_detection_chance(player, door)
 					if randf() <= det_chance:
 						door.reveal()
@@ -544,7 +611,7 @@ func _scan_environment_with_perception() -> void:
 		if not trap.is_revealed:
 			var dist = abs(t_pos.x - p_pos.x) + abs(t_pos.y - p_pos.y)
 			if dist <= player.vision.view_distance_tiles:
-				if player.vision.has_line_of_sight(grid, p_pos, t_pos):
+				if VisionComponent.has_line_of_sight(grid, p_pos, t_pos):
 					var det_chance = VisionComponent.calculate_detection_chance(player, trap)
 					if randf() <= det_chance:
 						trap.reveal()

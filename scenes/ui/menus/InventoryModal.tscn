@@ -1,0 +1,177 @@
+[gd_scene load_steps=3 format=3 uid="uid://inventory_modal_01"]
+
+[ext_resource type="Script" path="res://scripts/ui/InventoryModal.gd" id="1_inv"]
+[ext_resource type="PackedScene" uid="uid://item_tooltip_01" path="res://scenes/ui/components/ItemTooltip.tscn" id="2_tooltip"]
+
+[node name="InventoryModal" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -440.0
+offset_top = -260.0
+offset_right = 440.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_inv")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeaderBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="LabelTitle" type="Label" parent="VBox/HeaderBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "INVENTORY & EQUIPMENT (PRESS 'I' OR ESC TO CLOSE)"
+
+[node name="BtnClose" type="Button" parent="VBox/HeaderBar"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = " X "
+
+[node name="HSeparator1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="MainSplit" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="PaperdollPane" type="VBoxContainer" parent="VBox/MainSplit"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelPaperdoll" type="Label" parent="VBox/MainSplit/PaperdollPane"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "ANATOMICAL PAPERDOLL"
+horizontal_alignment = 1
+
+[node name="SilhouetteBox" type="GridContainer" parent="VBox/MainSplit/PaperdollPane"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="Slot_HEAD" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "HEAD"
+
+[node name="Slot_BACK" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "BACK"
+
+[node name="Slot_ACCESSORY" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "ACCS"
+
+[node name="Slot_MAIN_HAND" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "MAIN"
+
+[node name="Slot_BODY" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "BODY"
+
+[node name="Slot_OFF_HAND" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "OFF"
+
+[node name="Slot_BELT" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "BELT"
+
+[node name="Slot_LEGS" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "LEGS"
+
+[node name="Slot_FEET" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "FEET"
+
+[node name="Slot_RING_1" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "RNG1"
+
+[node name="Slot_RING_2" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "RNG2"
+
+[node name="Slot_AMMUNITION" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
+custom_minimum_size = Vector2(88, 44)
+layout_mode = 2
+text = "AMMO"
+
+[node name="VSeparator" type="VSeparator" parent="VBox/MainSplit"]
+layout_mode = 2
+
+[node name="BackpackPane" type="VBoxContainer" parent="VBox/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="LabelBackpack" type="Label" parent="VBox/MainSplit/BackpackPane"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "BACKPACK (8x5 GRID - RIGHT CLICK TO EQUIP/SWAP)"
+
+[node name="ScrollBackpack" type="ScrollContainer" parent="VBox/MainSplit/BackpackPane"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GridSlots" type="GridContainer" parent="VBox/MainSplit/BackpackPane/ScrollBackpack"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+columns = 8
+
+[node name="HSeparator2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="FooterBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="LabelWeight" type="Label" parent="VBox/FooterBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
+text = "Weight: 0.0 / 20.0 Stones"
+
+[node name="LabelArmor" type="Label" parent="VBox/FooterBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.75, 1, 1)
+text = "Total Armor: +0 Soak"
+
+[node name="LabelGold" type="Label" parent="VBox/FooterBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+text = "Gold: 0 GP"
+
+[node name="ItemTooltip" parent="." instance=ExtResource("2_tooltip")]
+visible = false
+layout_mode = 2

@@ -324,8 +324,7 @@ func test_bestiary_records_and_tiered_knowledge() -> void:
 
 func test_character_creation_attribute_allocation() -> void:
 	var modal_script = load("res://scripts/ui/CharacterCreationModal.gd")
-	assert_true(modal_script != null, "CharacterCreationModal script must exist")
-	var modal = track(modal_script.new()) as CharacterCreationModal
+	var modal = track(modal_script.new())
 	
 	# Default budget allocation: by default all attributes start at 1, 0 spent, 20 remaining
 	assert_eq(modal.attributes["strength"], 1, "Strength should start at 1")
@@ -364,9 +363,11 @@ func test_character_creation_attribute_allocation() -> void:
 func test_character_creation_modal_scene_instantiation_and_open() -> void:
 	var scene = load("res://scenes/ui/menus/CharacterCreationModal.tscn")
 	assert_true(scene != null, "CharacterCreationModal.tscn must exist")
-	var modal = track(scene.instantiate()) as CharacterCreationModal
-	modal._ready()
-	modal.open_modal()
+	var modal = track(scene.instantiate())
+	var tree = Engine.get_main_loop() as SceneTree
+	if tree and tree.root:
+		tree.root.add_child(modal)
+	modal.call("open_modal")
 	assert_true(modal.visible, "Modal must become visible upon open_modal()")
 	assert_eq(modal.get_remaining_points(), 20, "Modal should open with 20 points remaining")
 	assert_true(modal.btn_embark.disabled, "Embark button must be disabled when points remain to be distributed")
