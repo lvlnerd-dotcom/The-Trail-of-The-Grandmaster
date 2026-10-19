@@ -19,6 +19,12 @@ signal entity_died(entity: Node2D)
 
 var current_hp: float = 100.0
 var current_mana: float = 50.0
+@export var max_hp_override: float = -1.0
+
+func get_max_health() -> float:
+    if max_hp_override > 0.0:
+        return max_hp_override
+    return attributes.get_max_health() if attributes else 100.0
 
 # Base turn regeneration constants
 const BASE_HP_REGEN_PER_TURN: float = 0.5
@@ -42,10 +48,10 @@ func _ready() -> void:
     _recalculate_max_vitals(true)
 
 func _recalculate_max_vitals(reset_to_full: bool = false) -> void:
-    if not attributes:
+    if not attributes and max_hp_override <= 0.0:
         return
-    var max_hp = attributes.get_max_health()
-    var max_mana = attributes.get_max_mana()
+    var max_hp = get_max_health()
+    var max_mana = attributes.get_max_mana() if attributes else 50.0
     
     if reset_to_full:
         current_hp = max_hp
@@ -73,7 +79,7 @@ func take_damage(amount: int, attacker: Node2D = null) -> int:
     
     if actual_damage > 0:
         current_hp = maxf(0.0, current_hp - actual_damage)
-    var max_hp = attributes.get_max_health() if attributes else 100.0
+    var max_hp = get_max_health()
     emit_signal("health_changed", current_hp, max_hp)
     
     var bus = _get_event_bus()
@@ -88,9 +94,7 @@ func take_damage(amount: int, attacker: Node2D = null) -> int:
     return actual_damage
 
 func heal(amount: float) -> float:
-    if not attributes:
-        return 0.0
-    var max_hp = attributes.get_max_health()
+    var max_hp = get_max_health()
     var healed = minf(amount, max_hp - current_hp)
     current_hp += healed
     emit_signal("health_changed", current_hp, max_hp)

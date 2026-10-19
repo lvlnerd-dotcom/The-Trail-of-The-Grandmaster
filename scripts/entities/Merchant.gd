@@ -199,3 +199,19 @@ func close_shop() -> void:
 	var bus = _get_event_bus()
 	if bus:
 		bus.emit_signal("shop_closed")
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+	var data = InspectionData.new()
+	var m_name = shop_data.merchant_name if shop_data else "Traveling Merchant"
+	data.title = m_name
+	data.category = InspectionData.Category.ALLY_OR_NPC
+	data.category_text = "Peaceful Merchant"
+	data.grid_cell = grid_pos
+	data.icon_glyph = "$"
+	data.accent_color = Color(1.0, 0.85, 0.2)
+	data.health_status_text = "Uninjured"
+	data.health_status_color = Color(0.20, 0.90, 0.40)
+	var stock_count = shop_data.stock_items.size() + shop_data.stock_spells.size() if shop_data else 0
+	var gold_val = shop_data.merchant_gold if shop_data else 0
+	data.description = "Offers wares & trade • Stock: %d wares • Coffers: %d GP" % [stock_count, gold_val]
+	return data

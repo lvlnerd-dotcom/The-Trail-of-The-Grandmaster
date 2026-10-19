@@ -149,6 +149,67 @@ func _execute_melee_attack(target: Node2D, direction: Vector2i) -> void:
 func _execute_wait_turn() -> void:
 	turn_manager.submit_player_action("wait", {"immediate_resolve": true})
 
+func get_ranged_targeting_context() -> Dictionary:
+	if not inventory:
+		return {"can_target": false, "reason": "No inventory available"}
+	var weapon = inventory.get_equipped_weapon()
+	var ammo = inventory.get_equipped_ammo()
+
+	# 1. Check equipped ranged weapon (Bow, High-Tension Bow, Firearm, Sling, Reach/Ranged Weapon)
+	if weapon and (
+		weapon.weapon_type == AttributesData.WeaponType.BOW or
+		weapon.weapon_type == AttributesData.WeaponType.HIGH_TENSION_BOW or
+		weapon.weapon_type == AttributesData.WeaponType.FIREARM or
+		weapon.weapon_type == AttributesData.WeaponType.THROWN or
+		weapon.weapon_type == AttributesData.WeaponType.SLING or
+		weapon.range_tiles > 1
+	):
+		var needs_arrows = (weapon.weapon_type == AttributesData.WeaponType.BOW or weapon.weapon_type == AttributesData.WeaponType.HIGH_TENSION_BOW)
+		if needs_arrows and (not ammo or ammo.quantity <= 0):
+			return {"can_target": false, "reason": "No arrows equipped in Ammunition slot!"}
+		var r_tiles = weapon.range_tiles if weapon.range_tiles > 1 else 6
+		var a_rad = ammo.area_radius if (ammo and ammo.area_radius > weapon.area_radius) else weapon.area_radius
+		return {
+			"can_target": true,
+			"mode": TargetingSystem.ActionMode.RANGED_WEAPON,
+			"label": weapon.item_name,
+			"max_range": r_tiles,
+			"area_radius": a_rad,
+			"is_beam": false,
+			"is_teleport": false,
+			"allow_self": false,
+			"weapon": weapon,
+			"ammo": ammo
+		}
+
+	# 2. Check equipped throwable / explosive ammunition (Throwing Knives, Alchemical Bombs)
+	if ammo and ammo.quantity > 0:
+		var r_tiles = ammo.range_tiles if ammo.range_tiles > 1 else 5
+		return {
+			"can_target": true,
+			"mode": TargetingSystem.ActionMode.RANGED_WEAPON,
+			"label": ammo.item_name,
+			"max_range": r_tiles,
+			"area_radius": ammo.area_radius,
+			"is_beam": false,
+			"is_teleport": false,
+			"allow_self": false,
+			"weapon": null,
+			"ammo": ammo
+		}
+
+	return {"can_target": false, "reason": "No ranged weapon or throwing ammunition equipped!"}
+
+func execute_ranged_weapon_attack(target_cell: Vector2i, p_weapon: ItemData = null, p_ammo: ItemData = null) -> Dictionary:
+	if not combat or not grid:
+		return {"success": false, "message": "Combat system unavailable"}
+	var dir = target_cell - grid_pos
+	if dir != Vector2i.ZERO:
+		set_facing_direction(Vector2i(clampi(dir.x, -1, 1), clampi(dir.y, -1, 1)))
+	var w = p_weapon if p_weapon else (inventory.get_equipped_weapon() if inventory else null)
+	var a = p_ammo if p_ammo else (inventory.get_equipped_ammo() if inventory else null)
+	return combat.execute_ranged_attack(grid_pos, target_cell, grid, w, a)
+
 func _handle_click_move(target_cell: Vector2i) -> void:
 	var path = grid.find_path(grid_pos, target_cell)
 	if path.size() >= 2:
@@ -159,3 +220,29 @@ func _handle_click_move(target_cell: Vector2i) -> void:
 func _on_player_action_finished() -> void:
 	if turn_manager and turn_manager.current_state == TurnManager.TurnState.PLAYER_TURN:
 		turn_manager.on_player_action_finished()
+
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+	var data = InspectionData.new()
+	var c_name = get_meta("class_name") if has_meta("class_name") else "Initiate Delver"
+	data.title = "%s (You)" % c_name
+	data.category = InspectionData.Category.ALLY_OR_NPC
+	data.category_text = "The Delver • Player"
+	data.grid_cell = grid_pos
+	data.icon_glyph = "@"
+	data.accent_color = Color(0.3, 0.85, 1.0)
+	
+	if stats and stats.attributes:
+		var max_hp = stats.attributes.get_max_health()
+		var h_info = BaseEntity.get_health_status_info(stats.current_hp, max_hp)
+		data.health_status_text = h_info["label"]
+		data.health_status_color = h_info["color"]
+	else:
+		data.health_status_text = "Unknown"
+		data.health_status_color = Color(0.7, 0.7, 0.7)
+		
+	var stance = "DODGE"
+	if skills and skills.active_defensive_mode == SkillComponent.DefensiveMode.PARRY_BLOCK:
+		stance = "PARRY"
+	data.description = "Defensive Stance: %s • Ready for action." % stance
+	return data

@@ -82,3 +82,12 @@ func _draw() -> void:
 			for dot in dots:
 				var dot_rad = randf_range(1.5, 3.0)
 				draw_circle(pos + dot, dot_rad, Color(0.5, 0.05, 0.05, 0.65))
+
+func get_decal_types_at(cell: Vector2i) -> Array[String]:
+	var types: Array[String] = []
+	for d in decals:
+		if d.get("cell") == cell:
+			var t = d.get("type", "")
+			if t != "" and not types.has(t):
+				types.append(t)
+	return types

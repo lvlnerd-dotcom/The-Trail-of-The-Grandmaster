@@ -100,3 +100,20 @@ func pray(player: Node2D) -> Dictionary:
 		"taboo_modifiers": scaled_taboo,
 		"covenant": covenant
 	}
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+	var data = InspectionData.new()
+	data.category = InspectionData.Category.ITEM_OR_OBJECT
+	data.grid_cell = grid_pos
+	data.icon_glyph = "†"
+	data.accent_color = Color(0.85, 0.65, 1.0)
+	var title_str = shrine_data.title if shrine_data and shrine_data.title != "" else "Deity Shrine"
+	data.title = title_str
+	var deity = shrine_data.deity_name if shrine_data else "Unknown Patron"
+	var state_str = "Spent Altar" if is_activated else "Active Altar"
+	data.category_text = "%s • %s" % [deity, state_str]
+	var desc_str = shrine_data.description if shrine_data and shrine_data.description != "" else "An ancient shrine etched with astral script."
+	if shrine_data and shrine_data.blessing_description != "":
+		desc_str += " Blessing: " + shrine_data.blessing_description
+	data.description = desc_str
+	return data

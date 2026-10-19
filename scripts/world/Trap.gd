@@ -120,3 +120,26 @@ func _draw() -> void:
             draw_circle(Vector2.ZERO, half * 0.4, Color(0.8, 0.7, 0.1, 0.3))
             draw_arc(Vector2.ZERO, half * 0.45, 0, 2 * PI, 12, y_col, 2.0)
             draw_circle(Vector2.ZERO, half * 0.15, y_col)
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+    var data = InspectionData.new()
+    data.category = InspectionData.Category.HAZARD
+    data.grid_cell = grid_pos
+    data.icon_glyph = "!"
+    data.accent_color = Color(1.0, 0.6, 0.2)
+    
+    var state_tag = "Triggered / Spent" if is_triggered else "Armed Hazard"
+    data.category_text = "Trap • %s" % state_tag
+    
+    match trap_type:
+        TrapType.SPIKE:
+            data.title = "Spike Trap"
+            data.description = "Concealed floor spikes (12-18 physical damage, mitigated by armor)."
+        TrapType.POISON_DART:
+            data.title = "Poison Dart Trap"
+            data.description = "Pressurized venom dart (8-12 damage + 15 MP drain)."
+        TrapType.ALARM:
+            data.title = "Alarm Trap"
+            data.description = "Acoustic tripwire that alerts all nearby hostiles when stepped on."
+            
+    return data

@@ -59,3 +59,14 @@ func _draw() -> void:
         draw_arc(Vector2.ZERO, half * 0.6, PI, 2 * PI, 8, Color(0.4, 0.8, 1.0, 0.9), 2.0)
         draw_line(Vector2(-half * 0.6, 0), Vector2(-half * 0.6, half * 0.6), Color(0.4, 0.8, 1.0, 0.9), 2.0)
         draw_line(Vector2(half * 0.6, 0), Vector2(half * 0.6, half * 0.6), Color(0.4, 0.8, 1.0, 0.9), 2.0)
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+    var data = InspectionData.new()
+    data.category = InspectionData.Category.TERRAIN
+    data.grid_cell = grid_pos
+    data.icon_glyph = "D"
+    data.accent_color = Color(0.3, 0.7, 1.0)
+    data.title = "Revealed Secret Door"
+    data.category_text = "Passageway • Unlocked"
+    data.description = "A concealed stone doorway now unsealed and passable."
+    return data

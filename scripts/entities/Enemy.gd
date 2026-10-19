@@ -15,6 +15,7 @@ enum AIState {
 @export var base_kill_exp: int = 35
 @export var vision_range: int = 7
 @export var is_undead: bool = false
+@export var max_hp: float = 0.0
 
 @onready var stats: StatsComponent = $StatsComponent
 @onready var skills: SkillComponent = $SkillComponent
@@ -37,6 +38,7 @@ func _ready() -> void:
 func setup_enemy(p_name: String, p_hp: float, p_exp: int, p_str: int = 8, p_dex: int = 8) -> void:
     enemy_name = p_name
     base_kill_exp = p_exp
+    max_hp = p_hp
     
     if not stats:
         stats = get_node_or_null("StatsComponent") as StatsComponent
@@ -49,9 +51,11 @@ func setup_enemy(p_name: String, p_hp: float, p_exp: int, p_str: int = 8, p_dex:
     if not vision:
         vision = get_node_or_null("VisionComponent") as VisionComponent
     
-    if stats and stats.attributes:
-        stats.attributes.strength = p_str
-        stats.attributes.dexterity = p_dex
+    if stats:
+        stats.max_hp_override = p_hp
+        if stats.attributes:
+            stats.attributes.strength = p_str
+            stats.attributes.dexterity = p_dex
         stats.current_hp = p_hp
         
     # Give basic crude weapon
@@ -203,3 +207,48 @@ func _on_death(_victim: Node2D) -> void:
     var tween = create_tween()
     tween.tween_property(self, "modulate:a", 0.0, 0.2)
     tween.finished.connect(queue_free)
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+    var data = InspectionData.new()
+    data.title = enemy_name
+    data.category = InspectionData.Category.HOSTILE
+    data.category_text = "Undead Hostile" if is_undead else "Hostile Creature"
+    data.grid_cell = grid_pos
+    data.icon_glyph = "U" if is_undead else "E"
+    data.accent_color = Color(1.0, 0.38, 0.38)
+    
+    if stats:
+        var max_health = stats.get_max_health() if stats.has_method("get_max_health") else (max_hp if max_hp > 0.0 else (stats.attributes.get_max_health() if stats.attributes else 100.0))
+        var h_info = BaseEntity.get_health_status_info(stats.current_hp, max_health)
+        data.health_status_text = h_info["label"]
+        data.health_status_color = h_info["color"]
+    else:
+        data.health_status_text = "Unknown"
+        data.health_status_color = Color(0.7, 0.7, 0.7)
+    
+    var traits: Array[String] = []
+    match ai_state:
+        AIState.IDLE:
+            traits.append("Posture: Guarding / Idle")
+        AIState.PATROL:
+            traits.append("Posture: Patrolling")
+        AIState.CHASE:
+            traits.append("Posture: Stalking Prey")
+        AIState.ATTACK:
+            traits.append("Posture: Engaging in Combat")
+        AIState.FLEE:
+            traits.append("Posture: Retreating / Fleeing")
+            
+    if intimidation_status != "":
+        traits.append("[%s - %d turns]" % [intimidation_status, intimidation_turns_remaining])
+        
+    if inventory:
+        var w = inventory.get_equipped_weapon()
+        if w:
+            traits.append("Armed with %s" % w.item_name)
+        var arm = inventory.get_total_armor()
+        if arm > 0:
+            traits.append("Armor: %d" % arm)
+            
+    data.description = " • ".join(traits) if traits.size() > 0 else "A dangerous dungeon hostile."
+    return data

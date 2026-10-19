@@ -67,3 +67,14 @@ signal victory_achieved(summary: Dictionary)
 signal camera_trauma_requested(amount: float, direction: Vector2)
 signal decal_requested(decal_type: String, cell: Vector2i)
 signal audio_play_requested(sound_name: String, bus_name: String)
+
+# Phase 8: UI & Hover Inspection Signals
+signal tile_hovered(cell: Vector2i, inspection_data: Resource)
+signal tile_hover_cleared()
+
+# Phase 9: Manual Line-of-Fire Targeting Signals
+signal targeting_started(context: Dictionary)
+signal targeting_cursor_updated(cursor_cell: Vector2i, lof_data: Dictionary)
+signal targeting_confirmed(effective_cell: Vector2i, lof_data: Dictionary)
+signal targeting_canceled()
+

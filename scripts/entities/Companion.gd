@@ -257,3 +257,24 @@ func _find_nearest_enemy_in_los() -> Node2D:
 					closest_dist = dist
 					closest_enemy = enemy
 	return closest_enemy
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+	var data = InspectionData.new()
+	var c_name = companion_data.companion_name if companion_data else "Faithful Companion"
+	data.title = c_name
+	data.category = InspectionData.Category.ALLY_OR_NPC
+	data.category_text = "Allied Companion"
+	data.grid_cell = grid_pos
+	data.icon_glyph = "C"
+	data.accent_color = Color(0.4, 0.9, 0.6)
+	
+	if is_downed:
+		data.health_status_text = "Downed"
+		data.health_status_color = Color(0.86, 0.08, 0.24)
+		data.description = "Downed in battle! Requires resting or aid to recover."
+	else:
+		var h_info = BaseEntity.get_health_status_info(current_hp, max_hp)
+		data.health_status_text = h_info["label"]
+		data.health_status_color = h_info["color"]
+		data.description = "Dmg: %d-%d • Armor Soak: %d • Dodge: %.0f%%" % [damage_min, damage_max, armor, dodge]
+	return data

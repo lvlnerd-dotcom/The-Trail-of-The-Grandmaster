@@ -100,3 +100,30 @@ func _play_bump_animation(direction: Vector2i) -> void:
         is_moving = false
         emit_signal("action_finished")
     )
+
+## Returns a dictionary with "label": String and "color": Color along the qualitative health spectrum:
+## Emerald Green (Full) -> Chartreuse -> Amber -> Orange-Red -> Crimson Red (Critical) -> Grey (Defeated)
+static func get_health_status_info(current_hp: float, max_hp: float) -> Dictionary:
+    if max_hp <= 0.0:
+        return {"label": "Unknown", "color": Color(0.7, 0.7, 0.7)}
+    var r = clampf(current_hp / max_hp, 0.0, 1.0)
+    if r >= 0.95:
+        return {"label": "Uninjured", "color": Color(0.20, 0.90, 0.40)} # Emerald Green (#33e666)
+    elif r >= 0.70:
+        return {"label": "Barely Scratched", "color": Color(0.65, 0.92, 0.30)} # Chartreuse (#a6eb4d)
+    elif r >= 0.40:
+        return {"label": "Wounded", "color": Color(1.00, 0.80, 0.20)} # Amber Gold (#ffcc33)
+    elif r >= 0.15:
+        return {"label": "Badly Wounded", "color": Color(0.95, 0.42, 0.18)} # Deep Orange-Red (#f26b2e)
+    elif r > 0.0:
+        return {"label": "Near Death", "color": Color(0.86, 0.08, 0.24)} # Crimson Red (#dc143c)
+    else:
+        return {"label": "Defeated", "color": Color(0.50, 0.50, 0.55)} # Ashen Grey (#80808c)
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+    var data = InspectionData.new()
+    data.title = name
+    data.category = InspectionData.Category.UNKNOWN
+    data.category_text = "Entity"
+    data.grid_cell = grid_pos
+    return data

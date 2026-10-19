@@ -5,6 +5,7 @@ extends Node
 
 enum TurnState {
     WAITING_FOR_INPUT,
+    TARGETING,
     PLAYER_TURN,
     COMPANION_TURN,
     ENEMY_TURN,
@@ -70,8 +71,21 @@ func unregister_companion(companion: Node2D) -> void:
 func can_accept_player_input() -> bool:
     return current_state == TurnState.WAITING_FOR_INPUT
 
+func is_targeting() -> bool:
+    return current_state == TurnState.TARGETING
+
+func begin_targeting() -> bool:
+    if current_state != TurnState.WAITING_FOR_INPUT:
+        return false
+    _transition_to(TurnState.TARGETING)
+    return true
+
+func cancel_targeting() -> void:
+    if current_state == TurnState.TARGETING:
+        _transition_to(TurnState.WAITING_FOR_INPUT)
+
 func submit_player_action(action_type: String, details: Dictionary = {}) -> void:
-    if not can_accept_player_input():
+    if current_state != TurnState.WAITING_FOR_INPUT and current_state != TurnState.TARGETING:
         return
     
     _transition_to(TurnState.PLAYER_TURN)
@@ -84,6 +98,7 @@ func submit_player_action(action_type: String, details: Dictionary = {}) -> void
     # In Phase 1, player movement notifies completion via on_player_action_finished
     if details.get("immediate_resolve", false):
         on_player_action_finished()
+
 
 func on_player_action_finished() -> void:
     # Phase 2: Companions

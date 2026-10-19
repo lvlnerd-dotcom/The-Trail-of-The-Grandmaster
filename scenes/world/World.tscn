@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" uid="uid://inventory_modal_01" path="res://scenes/ui/menus/InventoryModal.tscn" id="12_inv_modal"]
 [ext_resource type="PackedScene" uid="uid://skills_modal_01" path="res://scenes/ui/menus/SkillsModal.tscn" id="13_skills_modal"]
 [ext_resource type="PackedScene" uid="uid://hotbar_bar_01" path="res://scenes/ui/components/HotbarBar.tscn" id="14_hotbar"]
+[ext_resource type="PackedScene" uid="uid://inspector_panel_01" path="res://scenes/ui/components/InspectorPanel.tscn" id="15_inspector"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -82,9 +83,13 @@ text = "Action: Standby."
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.75, 1)
 theme_override_font_sizes/font_size = 12
-text = "Controls: WASD/Arrows to Move | Space to Wait | 'I' Inventory | 'K' Skills | 'L' Level-Up | 1-0 Hotbar Quick Cast"
+text = "Controls: WASD/Arrows Move | 'F' Ranged Aim | 1-0 Hotbar | Space Wait | 'I' Inv | 'K' Skills | 'L' Level-Up"
+
 
 [node name="HotbarBar" parent="UILayer" instance=ExtResource("14_hotbar")]
+layout_mode = 1
+
+[node name="InspectorPanel" parent="UILayer" instance=ExtResource("15_inspector")]
 layout_mode = 1
 
 [node name="LevelUpModal" parent="UILayer" instance=ExtResource("6_levelup")]

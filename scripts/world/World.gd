@@ -25,7 +25,13 @@ extends Node2D
 @onready var inventory_modal: InventoryModal = get_node_or_null("UILayer/InventoryModal") as InventoryModal
 @onready var skills_modal: SkillsModal = get_node_or_null("UILayer/SkillsModal") as SkillsModal
 @onready var hotbar_bar: HotbarBar = get_node_or_null("UILayer/HotbarBar") as HotbarBar
+@onready var inspector_panel: InspectorPanel = get_node_or_null("UILayer/InspectorPanel") as InspectorPanel
 @onready var decals_layer: DecalsLayer = get_node_or_null("DecalsLayer") as DecalsLayer
+
+var inspection_controller: HoverInspectionController = null
+var targeting_system: TargetingSystem = null
+var targeting_overlay: TargetingOverlay = null
+var _last_targeting_mouse_cell: Vector2i = Vector2i(-1, -1)
 
 const PLAYER_SCENE = preload("res://scenes/entities/player/Player.tscn")
 const ENEMY_SCENE = preload("res://scenes/entities/enemies/Enemy.tscn")
@@ -47,6 +53,14 @@ var fow_system: FogOfWarSystem = null
 func _ready() -> void:
 	fow_system = FogOfWarSystem.new()
 	add_child(fow_system)
+	targeting_system = TargetingSystem.new()
+	targeting_system.name = "TargetingSystem"
+	add_child(targeting_system)
+	targeting_overlay = TargetingOverlay.new()
+	targeting_overlay.name = "TargetingOverlay"
+	add_child(targeting_overlay)
+	inspection_controller = HoverInspectionController.new()
+	add_child(inspection_controller)
 	generator = DungeonGenerator.new(80, 60)
 	_generate_and_setup_floor(current_floor)
 	_connect_signals()
@@ -59,7 +73,16 @@ func _ready() -> void:
 			if bestiary_modal:
 				bestiary_modal.open_modal()
 		)
+	if inspector_panel and hotbar_bar:
+		inspector_panel.sync_with_hotbar(hotbar_bar)
 	_update_hud()
+
+func _process(_delta: float) -> void:
+	if targeting_system and targeting_system.is_active and grid:
+		var m_cell = grid.world_to_grid(get_global_mouse_position())
+		if m_cell != _last_targeting_mouse_cell:
+			_last_targeting_mouse_cell = m_cell
+			targeting_system.update_cursor(m_cell)
 
 func _generate_and_setup_floor(floor_num: int) -> void:
 	current_floor = floor_num
@@ -82,12 +105,19 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 	if fow_system:
 		fow_system.init_fog(grid.grid_width, grid.grid_height)
 	grid_visualizer.setup(grid, fow_system)
+	if targeting_overlay:
+		targeting_overlay.setup(grid, fow_system)
+	if inspection_controller:
+		inspection_controller.setup(self, grid, fow_system)
 	
 	# 3. Setup or relocate Player
 	if not player or not is_instance_valid(player):
 		_spawn_player(gen_result["start_cell"])
 	else:
 		player.init_grid_position(grid, gen_result["start_cell"], turn_manager)
+	if targeting_system:
+		targeting_system.setup(player, grid, turn_manager, fow_system)
+
 		
 	# Hook camera to collapse manager
 	if player and player.camera:
@@ -373,12 +403,26 @@ func _connect_signals() -> void:
 		if bus.has_signal("entity_damaged"):
 			bus.entity_damaged.connect(_on_entity_damaged_event)
 			
+	if targeting_system:
+		targeting_system.cursor_updated.connect(_on_targeting_cursor_updated)
+			
 	if player and player.stats:
 		player.stats.health_changed.connect(func(_c, _m): _update_hud())
 		player.stats.mana_changed.connect(func(_c, _m): _update_hud())
 		if player.stats.attributes:
 			player.stats.attributes.attribute_changed.connect(func(_n, _v): _update_hud())
 			player.stats.attributes.leveled_up.connect(func(_lvl, _pts): _update_hud())
+
+func _on_targeting_cursor_updated(cursor_cell: Vector2i, lof_data: Dictionary) -> void:
+	if label_log and targeting_system and targeting_system.is_active:
+		var act_label = targeting_system.active_context.get("label", "Target")
+		var status_str = lof_data.get("status_text", "")
+		label_log.text = "[TARGETING: %s] %s  |  [LMB/Enter: Confirm  •  Tab: Cycle  •  RMB/Esc: Cancel]" % [act_label, status_str]
+	if inspection_controller:
+		var insp_data = inspection_controller.inspect_cell(cursor_cell)
+		var bus = _get_event_bus()
+		if bus and insp_data:
+			bus.emit_signal("tile_hovered", cursor_cell, insp_data)
 
 func _on_entity_damaged_event(target: Node2D, _attacker: Node2D, _amount: int) -> void:
 	if decals_layer and is_instance_valid(target) and target.has_method("get") and target.get("grid_pos") != null:
@@ -416,12 +460,74 @@ func _on_victory_achieved(summary: Dictionary) -> void:
 		victory_modal.open_modal(summary)
 	_update_hud()
 
+func _unhandled_input(event: InputEvent) -> void:
+	if is_game_over:
+		return
+	if targeting_system and targeting_system.is_active and event is InputEventMouseButton:
+		var mb = event as InputEventMouseButton
+		if mb.pressed:
+			if mb.button_index == MOUSE_BUTTON_LEFT:
+				get_viewport().set_input_as_handled()
+				var click_cell = grid.world_to_grid(get_global_mouse_position())
+				targeting_system.update_cursor(click_cell)
+				_confirm_active_targeting()
+				return
+			elif mb.button_index == MOUSE_BUTTON_RIGHT:
+				get_viewport().set_input_as_handled()
+				_cancel_active_targeting()
+				return
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if is_game_over:
 		return
 		
 	if event is InputEventKey and event.pressed:
 		var key_event = event as InputEventKey
+
+		# --- 1. Active Manual Targeting Mode Controls ---
+		if targeting_system and targeting_system.is_active:
+			if key_event.keycode == KEY_ESCAPE:
+				get_viewport().set_input_as_handled()
+				_cancel_active_targeting()
+				return
+			if key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER or key_event.keycode == KEY_SPACE or key_event.keycode == KEY_F:
+				get_viewport().set_input_as_handled()
+				_confirm_active_targeting()
+				return
+			if key_event.keycode == KEY_TAB:
+				get_viewport().set_input_as_handled()
+				targeting_system.cycle_target()
+				return
+
+			var step_dir = Vector2i.ZERO
+			if event.is_action_pressed("move_up_left"):
+				step_dir = Vector2i(-1, -1)
+			elif event.is_action_pressed("move_up_right"):
+				step_dir = Vector2i(1, -1)
+			elif event.is_action_pressed("move_down_left"):
+				step_dir = Vector2i(-1, 1)
+			elif event.is_action_pressed("move_down_right"):
+				step_dir = Vector2i(1, 1)
+			elif event.is_action_pressed("move_up") or key_event.keycode == KEY_W or key_event.keycode == KEY_UP:
+				step_dir = Vector2i(0, -1)
+			elif event.is_action_pressed("move_down") or key_event.keycode == KEY_S or key_event.keycode == KEY_DOWN:
+				step_dir = Vector2i(0, 1)
+			elif event.is_action_pressed("move_left") or key_event.keycode == KEY_A or key_event.keycode == KEY_LEFT:
+				step_dir = Vector2i(-1, 0)
+			elif event.is_action_pressed("move_right") or key_event.keycode == KEY_D or key_event.keycode == KEY_RIGHT:
+				step_dir = Vector2i(1, 0)
+
+			if step_dir != Vector2i.ZERO:
+				get_viewport().set_input_as_handled()
+				targeting_system.step_cursor(step_dir)
+				return
+
+		# --- 2. Standard Mode Controls ---
+		if key_event.keycode == KEY_F:
+			get_viewport().set_input_as_handled()
+			start_ranged_weapon_targeting()
+			return
+
 		if key_event.keycode == KEY_TAB:
 			get_viewport().set_input_as_handled()
 			var new_mode = player.skills.toggle_defensive_mode()
@@ -474,15 +580,95 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 		if hotbar_idx != -1 and hotbar_bar:
 			get_viewport().set_input_as_handled()
-			var res = hotbar_bar.trigger_slot(hotbar_idx)
-			if res.get("success", false):
-				label_log.text = "Hotbar: %s" % res.get("message", "Action executed.")
-				if turn_manager:
-					turn_manager.submit_player_action("hotbar_action", {"message": res.get("message", ""), "immediate_resolve": true})
-				_update_hud()
-			else:
-				label_log.text = "Hotbar: %s" % res.get("message", "Cannot trigger slot.")
+			trigger_hotbar_slot(hotbar_idx)
 			return
+
+func start_ranged_weapon_targeting() -> bool:
+	if not player or not targeting_system:
+		return false
+	if targeting_system.is_active:
+		_cancel_active_targeting()
+	var ctx = player.get_ranged_targeting_context()
+	if not ctx.get("can_target", false):
+		if label_log:
+			label_log.text = "Ranged Attack: %s" % ctx.get("reason", "No ranged weapon equipped.")
+		return false
+	var ok = targeting_system.start_targeting(ctx)
+	_update_hud()
+	return ok
+
+func trigger_hotbar_slot(slot_idx: int) -> void:
+	if not hotbar_bar:
+		return
+	if targeting_system and targeting_system.is_active:
+		# If pressing the same hotbar slot while targeting, confirm the shot!
+		if int(targeting_system.active_context.get("slot_index", -1)) == slot_idx:
+			_confirm_active_targeting()
+			return
+		_cancel_active_targeting()
+
+	var res = hotbar_bar.trigger_slot(slot_idx)
+	if res.get("requires_targeting", false):
+		var ctx: Dictionary = res.get("context", {})
+		if targeting_system:
+			targeting_system.start_targeting(ctx)
+		_update_hud()
+	elif res.get("success", false):
+		label_log.text = "Hotbar: %s" % res.get("message", "Action executed.")
+		if turn_manager:
+			turn_manager.submit_player_action("hotbar_action", {"message": res.get("message", ""), "immediate_resolve": true})
+		update_fog_and_cull_entities()
+		_update_hud()
+	else:
+		label_log.text = "Hotbar: %s" % res.get("message", "Cannot trigger slot.")
+
+func _confirm_active_targeting() -> void:
+	if not targeting_system or not targeting_system.is_active:
+		return
+	var conf = targeting_system.confirm_target()
+	if not conf.get("confirmed", false):
+		if label_log:
+			label_log.text = "Targeting Blocked: %s" % conf.get("reason", "Invalid target!")
+		return
+
+	var cursor_pt: Vector2i = conf.get("cursor_cell", player.grid_pos)
+	var eff_pt: Vector2i = conf.get("effective_target_cell", cursor_pt)
+	var ctx: Dictionary = conf.get("context", {})
+	var mode: int = int(ctx.get("mode", TargetingSystem.ActionMode.NONE))
+
+	# Orient player facing toward the target
+	var aim_delta = eff_pt - player.grid_pos
+	if aim_delta != Vector2i.ZERO:
+		player.set_facing_direction(Vector2i(clampi(aim_delta.x, -1, 1), clampi(aim_delta.y, -1, 1)))
+
+	var exec_res: Dictionary = {}
+	if ctx.has("slot_index") and int(ctx["slot_index"]) >= 0 and hotbar_bar:
+		exec_res = hotbar_bar.trigger_slot(int(ctx["slot_index"]), cursor_pt)
+	elif mode == TargetingSystem.ActionMode.RANGED_WEAPON:
+		exec_res = player.execute_ranged_weapon_attack(cursor_pt, ctx.get("weapon") as ItemData, ctx.get("ammo") as ItemData)
+		if hotbar_bar:
+			hotbar_bar.refresh_hotbar()
+	elif mode == TargetingSystem.ActionMode.SPELL and player.spell_casting:
+		var sp = ctx.get("spell") as SpellData
+		exec_res = player.spell_casting.cast_spell(sp, cursor_pt, grid)
+
+	var msg = exec_res.get("message", "Action executed at (%d, %d)!" % [eff_pt.x, eff_pt.y])
+	if label_log:
+		label_log.text = msg
+
+	if turn_manager:
+		turn_manager.submit_player_action("targeted_action", {"message": msg, "result": exec_res, "immediate_resolve": true})
+	update_fog_and_cull_entities()
+	_scan_environment_with_perception()
+	_update_hud()
+
+func _cancel_active_targeting() -> void:
+	if targeting_system and targeting_system.is_active:
+		targeting_system.cancel_targeting()
+	if label_log:
+		label_log.text = "Targeting canceled."
+	_update_hud()
+
 
 func _update_hud() -> void:
 	if not label_status or not player or not player.stats:

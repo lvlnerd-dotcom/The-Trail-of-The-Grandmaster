@@ -68,6 +68,8 @@ func _init_boss_stats() -> void:
 	stats.attributes.intelligence = 18
 	stats.attributes.wisdom = 18
 	stats.attributes.charisma = 18
+	max_hp = MAX_BOSS_HP
+	stats.max_hp_override = MAX_BOSS_HP
 	stats.current_hp = MAX_BOSS_HP
 	
 	if not skills:
@@ -473,6 +475,46 @@ func _get_meta_mgr() -> Node:
 		return (loop as SceneTree).root.get_node_or_null("MetaManager")
 	return null
 
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+	var data = InspectionData.new()
+	data.title = enemy_name
+	data.category = InspectionData.Category.HOSTILE
+	data.category_text = "Floor 20 Boss • Ascendant Master"
+	data.grid_cell = grid_pos
+	data.icon_glyph = "Ω"
+	data.accent_color = Color(1.0, 0.84, 0.0) # Radiant Gold
+	
+	var cur_hp = stats.current_hp if stats else 0.0
+	var h_info = BaseEntity.get_health_status_info(cur_hp, MAX_BOSS_HP)
+	data.health_status_text = h_info["label"]
+	data.health_status_color = h_info["color"]
+	
+	var traits: Array[String] = []
+	match current_phase:
+		Phase.PHASE_1_MARTIAL:
+			traits.append("Phase I: Martial Ascendant")
+			var s_name = "Bulwark"
+			if current_stance == Stance.FRENZY:
+				s_name = "Frenzy"
+			elif current_stance == Stance.RIPOSTE:
+				s_name = "Riposte"
+			traits.append("Stance: %s" % s_name)
+		Phase.PHASE_2_ARCANE:
+			traits.append("Phase II: Arcane Sovereign")
+			if arcane_ward_hp > 0.0:
+				traits.append("Arcane Ward Active")
+			else:
+				traits.append("Ward Shattered")
+		Phase.PHASE_3_TRANSCENDENCE:
+			traits.append("Phase III: Transcendence")
+			if equilibrium_mode == Equilibrium.PHYSICAL_IMMUNE:
+				traits.append("Harmonic Equilibrium: Physical Immune")
+			else:
+				traits.append("Harmonic Equilibrium: Magic Immune")
+				
+	data.description = " • ".join(traits)
+	return data
+
 # ==========================================
 # SPECTRAL CLONE SUBCLASS
 # ==========================================
@@ -493,6 +535,8 @@ class SpectralClone extends Enemy:
 			stats = StatsComponent.new()
 			stats.name = "StatsComponent"
 			add_child(stats)
+		max_hp = 75.0
+		stats.max_hp_override = 75.0
 		stats.current_hp = 75.0
 		
 	func take_turn() -> void:
@@ -533,3 +577,17 @@ class SpectralClone extends Enemy:
 		if turn_manager and turn_manager.player:
 			return turn_manager.player as BaseEntity
 		return null
+
+	func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+		var data = InspectionData.new()
+		data.title = "%s Spectral Clone" % clone_tag.capitalize()
+		data.category = InspectionData.Category.HOSTILE
+		data.category_text = "Astral Apparition"
+		data.grid_cell = grid_pos
+		data.icon_glyph = "S" if clone_tag == "SHADOW" else "L"
+		data.accent_color = Color(0.6, 0.4, 0.9) if clone_tag == "SHADOW" else Color(1.0, 1.0, 0.6)
+		var h_info = BaseEntity.get_health_status_info(stats.current_hp if stats else 0.0, 75.0)
+		data.health_status_text = h_info["label"]
+		data.health_status_color = h_info["color"]
+		data.description = "A manifestation of astral ki bound to the Grandmaster."
+		return data

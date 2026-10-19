@@ -245,16 +245,38 @@ func cast_spell(spell: SpellData, target_cell: Vector2i, grid: DungeonGrid = nul
 	var potency = calculate_potency(spell)
 	var targets_hit: Array[Node2D] = []
 	var caster_cell = _get_caster_cell()
+	var effective_cell = target_cell
+	var was_intercepted = false
+	var lof_data: Dictionary = {}
+
+	if grid and spell.target_type != SpellData.TargetType.SELF:
+		lof_data = TargetingSystem.calculate_line_of_fire(
+			caster_cell,
+			target_cell,
+			grid,
+			spell.range_tiles,
+			spell.area_radius,
+			spell.target_type == SpellData.TargetType.BEAM,
+			spell.effect_type == SpellData.EffectType.TELEPORT,
+			caster
+		)
+		effective_cell = lof_data.get("effective_target_cell", target_cell)
+		was_intercepted = (int(lof_data.get("blocker_type", 0)) == TargetingSystem.BlockerType.ENTITY)
 	
 	match spell.effect_type:
 		SpellData.EffectType.DAMAGE:
 			var candidate_cells: Array[Vector2i] = []
-			if spell.target_type == SpellData.TargetType.AREA_EFFECT and spell.area_radius > 0:
+			if spell.target_type == SpellData.TargetType.BEAM and not lof_data.is_empty():
+				for c in lof_data.get("clear_cells", []):
+					candidate_cells.append(c as Vector2i)
+			elif spell.target_type == SpellData.TargetType.AREA_EFFECT and spell.area_radius > 0:
 				for dx in range(-spell.area_radius, spell.area_radius + 1):
 					for dy in range(-spell.area_radius, spell.area_radius + 1):
-						candidate_cells.append(target_cell + Vector2i(dx, dy))
+						var blast_pt = effective_cell + Vector2i(dx, dy)
+						if not grid or not grid.wall_cells.has(blast_pt):
+							candidate_cells.append(blast_pt)
 			else:
-				candidate_cells.append(target_cell)
+				candidate_cells.append(effective_cell)
 				
 			for cell in candidate_cells:
 				var occupant: Node2D = null
@@ -308,8 +330,8 @@ func cast_spell(spell: SpellData, target_cell: Vector2i, grid: DungeonGrid = nul
 							
 		SpellData.EffectType.HEALING:
 			var heal_target: Node2D = caster
-			if target_cell != caster_cell and grid:
-				var occ = grid.get_occupant(target_cell)
+			if effective_cell != caster_cell and grid:
+				var occ = grid.get_occupant(effective_cell)
 				if occ:
 					heal_target = occ
 					
@@ -335,24 +357,24 @@ func cast_spell(spell: SpellData, target_cell: Vector2i, grid: DungeonGrid = nul
 		SpellData.EffectType.TELEPORT:
 			if grid and caster:
 				var from_cell = _get_caster_cell()
-				grid.move_entity(caster, from_cell, target_cell)
-				caster.grid_pos = target_cell
-				caster.global_position = grid.grid_to_world(target_cell)
+				grid.move_entity(caster, from_cell, effective_cell)
+				caster.grid_pos = effective_cell
+				caster.global_position = grid.grid_to_world(effective_cell)
 			targets_hit.append(caster)
 			
 		SpellData.EffectType.STATUS_CLEANSE:
 			var cleanse_target: Node2D = caster
-			if target_cell != caster_cell and grid:
-				var occ = grid.get_occupant(target_cell)
+			if effective_cell != caster_cell and grid:
+				var occ = grid.get_occupant(effective_cell)
 				if occ:
 					cleanse_target = occ
 			targets_hit.append(cleanse_target)
 			if bus:
 				bus.emit_signal("spell_hit", spell, cleanse_target, 0, false)
 				
-	emit_signal("spell_cast_success", spell, target_cell)
+	emit_signal("spell_cast_success", spell, effective_cell)
 	if bus:
-		bus.emit_signal("spell_cast", spell, caster, target_cell)
+		bus.emit_signal("spell_cast", spell, caster, effective_cell)
 		
 	return {
 		"success": true,
@@ -360,8 +382,11 @@ func cast_spell(spell: SpellData, target_cell: Vector2i, grid: DungeonGrid = nul
 		"mana_spent": actual_cost,
 		"potency": potency,
 		"targets_hit": targets_hit,
+		"effective_target_cell": effective_cell,
+		"intercepted": was_intercepted,
 		"effect": spell.effect_type
 	}
+
 
 # --- Ward Shield Mechanics ---
 

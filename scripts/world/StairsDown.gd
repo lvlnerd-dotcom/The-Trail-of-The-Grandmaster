@@ -57,3 +57,14 @@ func _draw() -> void:
         
     # Center dark pit
     draw_rect(Rect2(-half * 0.25, -half * 0.25, half * 0.5, half * 0.5), Color(0.02, 0.02, 0.04, 1.0))
+
+func get_inspection_data(_viewer: Node2D = null) -> InspectionData:
+    var data = InspectionData.new()
+    data.category = InspectionData.Category.ITEM_OR_OBJECT
+    data.grid_cell = grid_pos
+    data.icon_glyph = ">"
+    data.accent_color = Color(0.95, 0.80, 0.25)
+    data.title = "Stairs Down"
+    data.category_text = "Dungeon Exit"
+    data.description = "Passageway leading down to Floor %d. Step here to descend." % (current_floor + 1)
+    return data

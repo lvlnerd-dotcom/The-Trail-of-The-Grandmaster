@@ -233,3 +233,127 @@ func _trigger_intimidation_check(victim: Node2D, player_attrs: AttributesData) -
                 victim.apply_intimidation("TERRIFIED", randi_range(3, 5))
             else:
                 victim.apply_intimidation("HESITANT", randi_range(1, 2))
+
+## Resolves a manual ranged attack (Bow, Firearm, Thrown Weapon, or Alchemical AoE Bomb) along a Line-of-Fire ray.
+## Enforces the Pass-Through / Obstacle Targeting Rule: if an intermediate entity stands on the line of fire,
+## that blocking entity intercepts and absorbs the attack (or centers the AoE detonation).
+func execute_ranged_attack(
+    origin_cell: Vector2i,
+    target_cell: Vector2i,
+    grid: DungeonGrid,
+    weapon: ItemData = null,
+    ammo: ItemData = null
+) -> Dictionary:
+    var active_item = weapon if weapon else ammo
+    var max_range = active_item.range_tiles if (active_item and active_item.range_tiles > 1) else 6
+    var area_radius = active_item.area_radius if active_item else 0
+    if ammo and ammo.area_radius > area_radius:
+        area_radius = ammo.area_radius
+
+    var lof = TargetingSystem.calculate_line_of_fire(
+        origin_cell,
+        target_cell,
+        grid,
+        max_range,
+        area_radius,
+        false,
+        false,
+        get_entity()
+    )
+
+    if not lof.get("is_valid", false):
+        return {
+            "success": false,
+            "hit": false,
+            "damage": 0,
+            "reason": lof.get("status_text", "Invalid ranged target"),
+            "lof": lof
+        }
+
+    var eff_cell: Vector2i = lof.get("effective_target_cell", target_cell)
+    var was_intercepted: bool = (int(lof.get("blocker_type", 0)) == TargetingSystem.BlockerType.ENTITY)
+
+    # Consume 1 unit of ammunition if applicable
+    if ammo:
+        ammo.quantity -= 1
+        var inv = get_inventory()
+        if ammo.quantity <= 0 and inv:
+            if inv.equipped_slots.get(ItemData.EquipSlot.AMMUNITION) == ammo:
+                inv.equipped_slots.erase(ItemData.EquipSlot.AMMUNITION)
+                inv.emit_signal("item_unequipped", ItemData.EquipSlot.AMMUNITION, ammo)
+            else:
+                inv.remove_item(ammo)
+
+    # 1. AoE Explosive / Alchemical Bomb Resolution
+    if area_radius > 0:
+        var targets_hit: Array[Node2D] = []
+        var total_dmg_dealt: int = 0
+        var aoe_cells: Array = lof.get("aoe_cells", [eff_cell])
+        var atk_stats = get_stats()
+        var atk_skills = get_skills()
+
+        for c in aoe_cells:
+            var cell_v = c as Vector2i
+            if grid and grid.is_occupied(cell_v):
+                var occ = grid.get_occupant(cell_v)
+                if is_instance_valid(occ) and occ != get_entity():
+                    var def_stats = occ.get_node_or_null("StatsComponent") as StatsComponent
+                    if def_stats:
+                        var min_d = active_item.base_damage_min if active_item else 10
+                        var max_d = active_item.base_damage_max if active_item else 18
+                        var dmg = randi_range(min_d, max_d)
+                        def_stats.take_damage(dmg, get_entity())
+                        targets_hit.append(occ)
+                        total_dmg_dealt += dmg
+                        var jitter = Vector2(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
+                        emit_signal("floating_text_requested", "BOOM! %d" % dmg, Color(1.0, 0.45, 0.1), occ.global_position + jitter)
+
+        if atk_skills and atk_stats:
+            atk_skills.train_skill(SkillData.SkillId.THROWING, 15.0, atk_stats.attributes)
+
+        var item_label = active_item.item_name if active_item else "Explosive"
+        var msg = "%s detonated at (%d, %d) hitting %d target(s)!" % [item_label, eff_cell.x, eff_cell.y, targets_hit.size()]
+        return {
+            "success": true,
+            "hit": not targets_hit.is_empty(),
+            "damage": total_dmg_dealt,
+            "targets_hit": targets_hit,
+            "effective_target_cell": eff_cell,
+            "intercepted": was_intercepted,
+            "message": msg,
+            "lof": lof
+        }
+
+    # 2. Single-Target Projectile Resolution (Bow, Firearm, Throwing Knife)
+    var defender: Node2D = lof.get("target_entity", null)
+    if not defender and grid and grid.is_occupied(eff_cell):
+        defender = grid.get_occupant(eff_cell)
+
+    if defender and is_instance_valid(defender) and defender != get_entity():
+        var atk_res = execute_attack(defender, active_item)
+        atk_res["success"] = true
+        atk_res["effective_target_cell"] = eff_cell
+        atk_res["intercepted"] = was_intercepted
+        atk_res["lof"] = lof
+        var def_name = defender.get("enemy_name") if "enemy_name" in defender else defender.name
+        var prefix = "[INTERCEPTED] " if was_intercepted else ""
+        if atk_res["hit"]:
+            atk_res["message"] = "%sRanged shot hits %s for %d damage!" % [prefix, def_name, atk_res["damage"]]
+        else:
+            atk_res["message"] = "%sRanged shot at %s missed (%s)!" % [prefix, def_name, atk_res["defense_type"]]
+        return atk_res
+
+    # Shot landed on an empty floor tile
+    if grid:
+        emit_signal("floating_text_requested", "Thud!", Color(0.7, 0.7, 0.7), grid.grid_to_world(eff_cell))
+    return {
+        "success": true,
+        "hit": false,
+        "damage": 0,
+        "defender": null,
+        "effective_target_cell": eff_cell,
+        "intercepted": was_intercepted,
+        "message": "Shot landed on empty floor at (%d, %d)." % [eff_cell.x, eff_cell.y],
+        "lof": lof
+    }
+
