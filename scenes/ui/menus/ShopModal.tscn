@@ -1,0 +1,225 @@
+[gd_scene load_steps=2 format=3 uid="uid://shop_modal_01"]
+
+[ext_resource type="Script" path="res://scripts/ui/ShopModal.gd" id="1_shop"]
+
+[node name="ShopModal" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -290.0
+offset_right = 480.0
+offset_bottom = 290.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shop")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="MerchantInfo" type="VBoxContainer" parent="VBox/HeaderBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LabelName" type="Label" parent="VBox/HeaderBar/MerchantInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "Travelling Merchant"
+
+[node name="LabelTitle" type="Label" parent="VBox/HeaderBar/MerchantInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "Purveyor of Goods"
+
+[node name="HeaderButtons" type="HBoxContainer" parent="VBox/HeaderBar"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnAttack" type="Button" parent="VBox/HeaderBar/HeaderButtons"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+text = "Attack Merchant"
+
+[node name="BtnClose" type="Button" parent="VBox/HeaderBar/HeaderButtons"]
+custom_minimum_size = Vector2(32, 28)
+layout_mode = 2
+text = " ✕ "
+
+[node name="SpeechBanner" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="LabelDialogue" type="Label" parent="VBox/SpeechBanner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.98, 1)
+theme_override_font_sizes/font_size = 13
+text = "\"Wares for trade, traveller. Make your selection.\""
+autowrap_mode = 2
+
+[node name="HSeparator1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="MainPanes" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="LeftPane" type="VBoxContainer" parent="VBox/MainPanes"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="LabelWares" type="Label" parent="VBox/MainPanes/LeftPane"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "MERCHANT WARES"
+
+[node name="FilterTabs" type="HBoxContainer" parent="VBox/MainPanes/LeftPane"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BtnAll" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "ALL"
+
+[node name="BtnWeapons" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "WEAPONS"
+
+[node name="BtnArmor" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "ARMOR"
+
+[node name="BtnConsumables" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "CONSUMABLES"
+
+[node name="BtnSpells" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "SPELLS"
+
+[node name="BtnAmmo" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "AMMO"
+
+[node name="BtnOther" type="Button" parent="VBox/MainPanes/LeftPane/FilterTabs"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "OTHER"
+
+[node name="ScrollMerchant" type="ScrollContainer" parent="VBox/MainPanes/LeftPane"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ListMerchant" type="VBoxContainer" parent="VBox/MainPanes/LeftPane/ScrollMerchant"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="VSeparator" type="VSeparator" parent="VBox/MainPanes"]
+layout_mode = 2
+
+[node name="RightPane" type="VBoxContainer" parent="VBox/MainPanes"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="LabelBackpack" type="Label" parent="VBox/MainPanes/RightPane"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "PLAYER BACKPACK (SELL)"
+
+[node name="ScrollPlayer" type="ScrollContainer" parent="VBox/MainPanes/RightPane"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ListPlayer" type="VBoxContainer" parent="VBox/MainPanes/RightPane/ScrollPlayer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="HSeparator2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LabelPlayerGold" type="Label" parent="VBox/BottomBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 12
+text = "Player Gold: 0 GP"
+
+[node name="LabelPlayerWeight" type="Label" parent="VBox/BottomBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 12
+text = "Weight: 0 / 100 st"
+
+[node name="LabelDiscountInfo" type="Label" parent="VBox/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "Mercantile Modifier: +0.0%"
+horizontal_alignment = 1
+
+[node name="BtnRefillAmmo" type="Button" parent="VBox/BottomBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Refill Equipped Ammo"
+
+[node name="ConfirmationPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="VBox" type="VBoxContainer" parent="ConfirmationPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LabelConfirmTitle" type="Label" parent="ConfirmationPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.25, 0.25, 1)
+theme_override_font_sizes/font_size = 16
+text = "CONFIRM ATTACK ON MERCHANT"
+horizontal_alignment = 1
+
+[node name="LabelConfirmPrompt" type="Label" parent="ConfirmationPanel/VBox"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 13
+text = "Are you sure you want to attack the merchant? All merchants will become deadly enemies for the rest of this run!"
+autowrap_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="ConfirmationPanel/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="BtnConfirmAttack" type="Button" parent="ConfirmationPanel/VBox/Buttons"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+text = "Yes, Attack!"
+
+[node name="BtnCancelAttack" type="Button" parent="ConfirmationPanel/VBox/Buttons"]
+layout_mode = 2
+text = "Cancel"

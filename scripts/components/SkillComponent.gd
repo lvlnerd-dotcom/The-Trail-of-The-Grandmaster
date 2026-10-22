@@ -7,6 +7,7 @@ const SkillData = preload("res://scripts/resources/SkillData.gd")
 
 signal skill_advanced(skill: SkillData, new_level: float)
 signal keystone_triggered(skill: SkillData, milestone: int)
+signal defensive_mode_changed(new_mode: DefensiveMode)
 
 enum DefensiveMode {
 	DODGE_EVADE,
@@ -32,10 +33,11 @@ func _ready() -> void:
 		_init_default_skills()
 
 func _init_default_skills() -> void:
-	# Initialize Tier 1 Starting skills (14 skills, Marksmanship removed)
+	# Initialize Tier 1 Starting skills (15 skills: 7 Weapon skills + 8 Utility/Magic/Defense skills)
 	_register_skill(SkillData.SkillId.SWORDSMANSHIP, "Swordsmanship", "strength", 0.0)
-	_register_skill(SkillData.SkillId.MACE_FIGHTING, "Mace Fighting", "strength", 0.0)
-	_register_skill(SkillData.SkillId.POLEARMS, "Polearms", "strength", 0.0)
+	_register_skill(SkillData.SkillId.BLUNT_WEAPON_FIGHTING, "Blunt Weapon Fighting", "strength", 0.0)
+	_register_skill(SkillData.SkillId.FINESSE_WEAPON_FIGHTING, "Finesse Weapon Fighting", "dexterity", 0.0)
+	_register_skill(SkillData.SkillId.POLEARMS, "Polearms", "constitution", 0.0)
 	_register_skill(SkillData.SkillId.BRAWLING, "Brawling", "strength", 0.0)
 	
 	_register_skill(SkillData.SkillId.ARCHERY, "Archery", "dexterity", 0.0)
@@ -50,6 +52,10 @@ func _init_default_skills() -> void:
 	
 	_register_skill(SkillData.SkillId.DIVINE_MAGIC, "Divine Magic", "wisdom", 0.0)
 	_register_skill(SkillData.SkillId.PERCEPTION, "Perception", "wisdom", 0.0)
+	
+	_register_skill(SkillData.SkillId.LOCKPICKING, "Lockpicking", "dexterity", 0.0)
+	_register_skill(SkillData.SkillId.DISABLE_DEVICE, "Disable Device", "dexterity", 0.0)
+	_register_skill(SkillData.SkillId.BARTERING, "Bartering", "charisma", 0.0)
 	
 	# Initialize Tier 2 Meta skills (5 skills, available for in-run organic training from 0.0)
 	_register_skill(SkillData.SkillId.MEDITATION, "Meditation", "wisdom", 0.0)
@@ -112,12 +118,19 @@ func get_effective_level(id: SkillData.SkillId, attributes: AttributesData) -> f
 	var skill = get_skill(id)
 	if not skill or not attributes:
 		return 0.0
-	var attr_val = _get_attribute_value(attributes, skill.associated_attribute_name)
-	var base_effective = skill.get_effective_level(attr_val)
+	var base_effective = skill.get_effective_level_with_attributes(attributes)
 	
 	# Check keystone synergies (e.g. 25 Parry grants bonus to Dodge with shield, etc.)
 	var synergy_bonus = _calculate_synergy_bonus(id)
 	return base_effective + synergy_bonus
+
+func is_weapon_ability_unlocked(weapon: ItemData) -> bool:
+	if not weapon or not weapon.active_ability:
+		return false
+	var skill = get_skill(weapon.associated_skill_id)
+	if not skill:
+		return false
+	return skill.level >= weapon.active_ability.required_skill_level
 
 func _calculate_synergy_bonus(id: SkillData.SkillId) -> float:
 	var bonus = 0.0
@@ -147,11 +160,18 @@ func train_skill(id: SkillData.SkillId, task_difficulty: float, attributes: Attr
 			bus.emit_signal("skill_xp_gained", skill.skill_name, 0.1, skill.level)
 	return leveled
 
+func set_defensive_mode(mode: DefensiveMode) -> bool:
+	var changed = (active_defensive_mode != mode)
+	active_defensive_mode = mode
+	if changed:
+		emit_signal("defensive_mode_changed", active_defensive_mode)
+	return changed
+
 func toggle_defensive_mode() -> DefensiveMode:
 	if active_defensive_mode == DefensiveMode.DODGE_EVADE:
-		active_defensive_mode = DefensiveMode.PARRY_BLOCK
+		set_defensive_mode(DefensiveMode.PARRY_BLOCK)
 	else:
-		active_defensive_mode = DefensiveMode.DODGE_EVADE
+		set_defensive_mode(DefensiveMode.DODGE_EVADE)
 	return active_defensive_mode
 
 func get_active_defensive_skill_id() -> SkillData.SkillId:

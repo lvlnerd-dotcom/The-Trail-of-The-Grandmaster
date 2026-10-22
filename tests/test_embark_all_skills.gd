@@ -14,6 +14,35 @@ const SpellCastingComponent = preload("res://scripts/components/SpellCastingComp
 func suite_name() -> String:
 	return "embark_all_skills"
 
+func setup() -> void:
+	var paths = [
+		"res://scripts/resources/WeaponAbilityData.gd",
+		"res://scripts/resources/SkillData.gd",
+		"res://scripts/resources/ItemData.gd",
+		"res://scripts/resources/WeaponManifest.gd",
+		"res://scripts/components/SkillComponent.gd",
+		"res://scripts/resources/CharacterCreationData.gd",
+		"res://scripts/components/InventoryComponent.gd",
+		"res://scripts/components/CombatComponent.gd",
+		"res://scripts/entities/Player.gd",
+		"res://scripts/entities/Enemy.gd",
+		"res://scripts/resources/MetaProfileData.gd",
+		"res://scripts/ui/InventoryModal.gd",
+		"res://scripts/ui/HotbarBar.gd",
+		"res://tests/test_phase6_class_specialization_and_meta.gd",
+		"res://tests/test_phase10_combat_weapons_synergy.gd"
+	]
+	for p in paths:
+		var s = ResourceLoader.load(p) as GDScript
+		if s:
+			var f = FileAccess.open(p, FileAccess.READ)
+			if f:
+				var src = f.get_as_text()
+				f.close()
+				if s.source_code != src:
+					s.source_code = src
+					s.reload(true)
+
 func _create_player_entity() -> Player:
 	var player = track(Player.new()) as Player
 	var p_stats = track(StatsComponent.new()) as StatsComponent
@@ -40,14 +69,14 @@ func _create_player_entity() -> Player:
 
 func test_all_19_skills_individual_embark() -> void:
 	var all_starting = CharacterCreationData.get_available_starting_skills()
-	assert_eq(all_starting.size(), 14, "Must have exactly 14 base starting skills available")
+	assert_eq(all_starting.size(), 18, "Must have exactly 18 base starting skills available (7 weapon skills + 11 non-weapon skills)")
 	
-	# Add meta skills to test all 19
+	# Add meta skills to test all 23
 	var meta_skills = SkillData.get_skills_by_tier(SkillData.SkillTier.META)
 	var all_19 = []
 	all_19.append_array(all_starting)
 	all_19.append_array(meta_skills)
-	assert_eq(all_19.size(), 19, "Must have 19 total starting + meta skills")
+	assert_eq(all_19.size(), 23, "Must have 23 total starting + meta skills")
 	
 	for s_id in all_19:
 		var player = _create_player_entity()
@@ -105,3 +134,13 @@ func test_all_multi_skill_draft_combinations_and_slot_conflicts() -> void:
 		# Verify inventory burden is valid and non-negative
 		var burden = player.inventory.get_carried_weight_stones()
 		assert_true(burden >= 0.0, "Carried weight is non-negative")
+
+func test_inventory_modal_scene_instantiation_and_ready() -> void:
+	var inv_scene = preload("res://scenes/ui/menus/InventoryModal.tscn")
+	var modal = track(inv_scene.instantiate()) as Control
+	assert_true(modal != null, "InventoryModal scene should instantiate successfully")
+	var tree = Engine.get_main_loop() as SceneTree
+	if tree and tree.root:
+		tree.root.add_child(modal)
+	modal._ready()
+	assert_true(modal.get_node_or_null("ContextMenuPanel") != null, "ContextMenuPanel should be created on _ready()")

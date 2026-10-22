@@ -15,6 +15,9 @@
 [ext_resource type="PackedScene" uid="uid://skills_modal_01" path="res://scenes/ui/menus/SkillsModal.tscn" id="13_skills_modal"]
 [ext_resource type="PackedScene" uid="uid://hotbar_bar_01" path="res://scenes/ui/components/HotbarBar.tscn" id="14_hotbar"]
 [ext_resource type="PackedScene" uid="uid://inspector_panel_01" path="res://scenes/ui/components/InspectorPanel.tscn" id="15_inspector"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/LootPickupModal.tscn" id="16_loot_modal"]
+[ext_resource type="PackedScene" uid="uid://shop_modal_01" path="res://scenes/ui/menus/ShopModal.tscn" id="17_shop_modal"]
+[ext_resource type="PackedScene" uid="uid://companion_command_bar_01" path="res://scenes/ui/components/CompanionCommandBar.tscn" id="18_comp_bar"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -92,6 +95,10 @@ layout_mode = 1
 [node name="InspectorPanel" parent="UILayer" instance=ExtResource("15_inspector")]
 layout_mode = 1
 
+[node name="CompanionCommandBar" parent="UILayer" instance=ExtResource("18_comp_bar")]
+layout_mode = 1
+visible = false
+
 [node name="LevelUpModal" parent="UILayer" instance=ExtResource("6_levelup")]
 visible = false
 
@@ -111,4 +118,10 @@ visible = false
 visible = false
 
 [node name="SkillsModal" parent="UILayer" instance=ExtResource("13_skills_modal")]
+visible = false
+
+[node name="LootPickupModal" parent="UILayer" instance=ExtResource("16_loot_modal")]
+visible = false
+
+[node name="ShopModal" parent="UILayer" instance=ExtResource("17_shop_modal")]
 visible = false

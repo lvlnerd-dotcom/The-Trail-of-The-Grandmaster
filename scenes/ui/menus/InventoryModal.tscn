@@ -9,10 +9,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -440.0
-offset_top = -260.0
-offset_right = 440.0
-offset_bottom = 260.0
+offset_left = -460.0
+offset_top = -270.0
+offset_right = 460.0
+offset_bottom = 270.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_inv")
@@ -45,7 +45,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 16
 
 [node name="PaperdollPane" type="VBoxContainer" parent="VBox/MainSplit"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -58,68 +58,69 @@ horizontal_alignment = 1
 
 [node name="SilhouetteBox" type="GridContainer" parent="VBox/MainSplit/PaperdollPane"]
 layout_mode = 2
+size_flags_horizontal = 4
 size_flags_vertical = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 3
 
 [node name="Slot_HEAD" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "HEAD"
 
 [node name="Slot_BACK" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "BACK"
 
 [node name="Slot_ACCESSORY" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "ACCS"
 
 [node name="Slot_MAIN_HAND" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "MAIN"
 
 [node name="Slot_BODY" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "BODY"
 
 [node name="Slot_OFF_HAND" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "OFF"
 
 [node name="Slot_BELT" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "BELT"
 
 [node name="Slot_LEGS" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "LEGS"
 
 [node name="Slot_FEET" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "FEET"
 
 [node name="Slot_RING_1" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "RNG1"
 
 [node name="Slot_RING_2" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "RNG2"
 
 [node name="Slot_AMMUNITION" type="Button" parent="VBox/MainSplit/PaperdollPane/SilhouetteBox"]
-custom_minimum_size = Vector2(88, 44)
+custom_minimum_size = Vector2(52, 52)
 layout_mode = 2
 text = "AMMO"
 
@@ -135,7 +136,47 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 13
-text = "BACKPACK (8x5 GRID - RIGHT CLICK TO EQUIP/SWAP)"
+text = "Double-click: Equip/Use • Right-click: Actions • Drag: Move/Drop"
+
+[node name="FilterToolbar" type="HBoxContainer" parent="VBox/MainSplit/BackpackPane"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BtnFilterAll" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "ALL"
+
+[node name="BtnFilterWeapons" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "WEAPONS"
+
+[node name="BtnFilterArmor" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "ARMOR"
+
+[node name="BtnFilterConsumables" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "CONSUMABLES"
+
+[node name="BtnFilterAmmo" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "AMMO"
+
+[node name="BtnFilterOther" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "OTHER"
+
+[node name="ToolbarSpacer" type="Control" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnSort" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "Sort: Type"
+
+[node name="BtnStack" type="Button" parent="VBox/MainSplit/BackpackPane/FilterToolbar"]
+layout_mode = 2
+text = "Stack"
 
 [node name="ScrollBackpack" type="ScrollContainer" parent="VBox/MainSplit/BackpackPane"]
 layout_mode = 2
@@ -154,13 +195,25 @@ layout_mode = 2
 
 [node name="FooterBar" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 20
 
-[node name="LabelWeight" type="Label" parent="VBox/FooterBar"]
+[node name="WeightBarContainer" type="HBoxContainer" parent="VBox/FooterBar"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="LabelWeight" type="Label" parent="VBox/FooterBar/WeightBarContainer"]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
 text = "Weight: 0.0 / 20.0 Stones"
+
+[node name="WeightProgressBar" type="ProgressBar" parent="VBox/FooterBar/WeightBarContainer"]
+custom_minimum_size = Vector2(100, 16)
+layout_mode = 2
+size_flags_vertical = 4
+max_value = 1.0
+value = 0.5
+show_percentage = false
 
 [node name="LabelArmor" type="Label" parent="VBox/FooterBar"]
 layout_mode = 2

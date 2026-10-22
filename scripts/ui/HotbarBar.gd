@@ -11,13 +11,16 @@ signal targeting_requested(slot_index: int, context: Dictionary)
 enum SlotType {
 	EMPTY,
 	SPELL,
-	ITEM
+	ITEM,
+	WEAPON_ABILITY
 }
 
 class HotbarSlot:
 	var slot_type: SlotType = SlotType.EMPTY
 	var spell: SpellData = null
 	var item: ItemData = null
+	var weapon_ability: WeaponAbilityData = null
+	var source_weapon: ItemData = null
 	var key_number: int = 1 # 1 through 10 (10 = key 0)
 
 @onready var slots_container: HBoxContainer = $Margin/HBoxSlots
@@ -80,6 +83,8 @@ func _init_slots() -> void:
 	refresh_hotbar()
 
 func setup(p_player: Node2D) -> void:
+	if slots.is_empty():
+		_init_slots()
 	player = p_player
 	_auto_populate_defaults()
 	refresh_hotbar()
@@ -90,6 +95,7 @@ func _auto_populate_defaults() -> void:
 	
 	var spell_cast = player.get_node_or_null("SpellCastingComponent") as SpellCastingComponent
 	var inv = player.get_node_or_null("InventoryComponent") as InventoryComponent
+	var skills_comp = player.get_node_or_null("SkillComponent") as SkillComponent
 	
 	var slot_idx = 0
 	# Assign known spells first
@@ -98,6 +104,13 @@ func _auto_populate_defaults() -> void:
 			if slot_idx < TOTAL_SLOTS:
 				set_slot_spell(slot_idx, sp)
 				slot_idx += 1
+
+	# Assign unlocked Level 25 weapon abilities if present
+	if inv and skills_comp:
+		var eq_weap = inv.get_equipped_weapon()
+		if eq_weap and skills_comp.is_weapon_ability_unlocked(eq_weap) and slot_idx < TOTAL_SLOTS:
+			set_slot_weapon_ability(slot_idx, eq_weap)
+			slot_idx += 1
 				
 	# Assign equipped throwable ammo if present
 	if inv:
@@ -113,29 +126,86 @@ func _auto_populate_defaults() -> void:
 					set_slot_item(slot_idx, it)
 					slot_idx += 1
 
+func sync_weapon_abilities() -> void:
+	if not player:
+		return
+	var inv = player.get_node_or_null("InventoryComponent") as InventoryComponent
+	var skills_comp = player.get_node_or_null("SkillComponent") as SkillComponent
+	if not inv or not skills_comp:
+		return
+
+	var candidates: Array[ItemData] = []
+	var mh = inv.get_equipped_weapon()
+	if mh and mh.active_ability and skills_comp.is_weapon_ability_unlocked(mh):
+		candidates.append(mh)
+	var ammo = inv.get_equipped_ammo()
+	if ammo and ammo.active_ability and skills_comp.is_weapon_ability_unlocked(ammo):
+		candidates.append(ammo)
+
+	for w in candidates:
+		var already_bound = false
+		for s in slots:
+			if s.slot_type == SlotType.WEAPON_ABILITY and s.weapon_ability and s.weapon_ability.ability_id == w.active_ability.ability_id:
+				s.source_weapon = w
+				already_bound = true
+				break
+		if not already_bound:
+			for i in range(slots.size()):
+				if slots[i].slot_type == SlotType.EMPTY:
+					set_slot_weapon_ability(i, w)
+					break
+	refresh_hotbar()
 
 func set_slot_spell(slot_idx: int, spell: SpellData) -> void:
+	if slots.is_empty():
+		_init_slots()
 	if slot_idx >= 0 and slot_idx < slots.size():
 		slots[slot_idx].slot_type = SlotType.SPELL
 		slots[slot_idx].spell = spell
 		slots[slot_idx].item = null
+		slots[slot_idx].weapon_ability = null
+		slots[slot_idx].source_weapon = null
 		refresh_hotbar()
 
 func set_slot_item(slot_idx: int, item: ItemData) -> void:
+	if slots.is_empty():
+		_init_slots()
 	if slot_idx >= 0 and slot_idx < slots.size():
 		slots[slot_idx].slot_type = SlotType.ITEM
 		slots[slot_idx].item = item
 		slots[slot_idx].spell = null
+		slots[slot_idx].weapon_ability = null
+		slots[slot_idx].source_weapon = null
 		refresh_hotbar()
+
+func set_slot_weapon_ability(slot_idx: int, weapon: ItemData) -> bool:
+	if slots.is_empty():
+		_init_slots()
+	if slot_idx < 0 or slot_idx >= slots.size() or not weapon or not weapon.active_ability:
+		return false
+	if player:
+		var skills_comp = player.get_node_or_null("SkillComponent") as SkillComponent
+		if skills_comp and not skills_comp.is_weapon_ability_unlocked(weapon):
+			return false
+	slots[slot_idx].slot_type = SlotType.WEAPON_ABILITY
+	slots[slot_idx].weapon_ability = weapon.active_ability
+	slots[slot_idx].source_weapon = weapon
+	slots[slot_idx].spell = null
+	slots[slot_idx].item = null
+	refresh_hotbar()
+	return true
 
 func clear_slot(slot_idx: int) -> void:
 	if slot_idx >= 0 and slot_idx < slots.size():
 		slots[slot_idx].slot_type = SlotType.EMPTY
 		slots[slot_idx].spell = null
 		slots[slot_idx].item = null
+		slots[slot_idx].weapon_ability = null
+		slots[slot_idx].source_weapon = null
 		refresh_hotbar()
 
 func refresh_hotbar() -> void:
+	var combat_comp = player.get_node_or_null("CombatComponent") as CombatComponent if player else null
 	for i in range(slots.size()):
 		if i >= slot_buttons.size():
 			continue
@@ -164,6 +234,16 @@ func refresh_hotbar() -> void:
 				else:
 					btn.text = "[%s]\n---" % key_str
 					btn.modulate = Color(0.4, 0.4, 0.4, 0.7)
+			SlotType.WEAPON_ABILITY:
+				if s.weapon_ability:
+					var short_name = s.weapon_ability.ability_name.substr(0, 5).to_upper()
+					var cd = combat_comp.get_ability_cooldown(s.weapon_ability.ability_id) if combat_comp else 0
+					var sub_tag = ("CD:%d" % cd) if cd > 0 else "TECH"
+					btn.text = "[%s] %s\n%s" % [key_str, short_name, sub_tag]
+					btn.modulate = Color(0.55, 0.55, 0.55, 0.8) if cd > 0 else Color(1.0, 0.55, 0.25)
+				else:
+					btn.text = "[%s]\n---" % key_str
+					btn.modulate = Color(0.4, 0.4, 0.4, 0.7)
 
 func requires_manual_targeting(slot_idx: int) -> bool:
 	if slot_idx < 0 or slot_idx >= slots.size():
@@ -179,6 +259,9 @@ func requires_manual_targeting(slot_idx: int) -> bool:
 		return true
 	elif s.slot_type == SlotType.ITEM and s.item:
 		if s.item.item_type == ItemData.ItemType.AMMO or s.item.item_type == ItemData.ItemType.WEAPON or s.item.area_radius > 0:
+			return true
+	elif s.slot_type == SlotType.WEAPON_ABILITY and s.weapon_ability:
+		if s.weapon_ability.requires_ranged_targeting() or s.weapon_ability.execution_type == WeaponAbilityData.ExecutionType.MELEE_REACH:
 			return true
 	return false
 
@@ -211,6 +294,24 @@ func get_slot_targeting_context(slot_idx: int) -> Dictionary:
 			"allow_self": false,
 			"slot_index": slot_idx,
 			"item": s.item
+		}
+	elif s.slot_type == SlotType.WEAPON_ABILITY and s.weapon_ability:
+		var max_r = s.weapon_ability.range_override
+		if max_r <= 0 and s.source_weapon:
+			max_r = maxi(1, s.source_weapon.range_tiles)
+		if max_r <= 0:
+			max_r = 1
+		return {
+			"mode": TargetingSystem.ActionMode.RANGED_WEAPON,
+			"label": s.weapon_ability.ability_name,
+			"max_range": max_r,
+			"area_radius": s.weapon_ability.area_radius,
+			"is_beam": false,
+			"is_teleport": false,
+			"allow_self": false,
+			"slot_index": slot_idx,
+			"weapon_ability": s.weapon_ability,
+			"source_weapon": s.source_weapon
 		}
 	return {}
 
@@ -268,13 +369,79 @@ func trigger_slot(slot_idx: int, target_cell: Vector2i = Vector2i(-1, -1)) -> Di
 			return {"success": false, "message": "Item unavailable"}
 
 		var item_ref = s.item
-		var it_name = item_ref.item_name
+		var it_name = item_ref.get_display_name() if item_ref.has_method("get_display_name") else item_ref.item_name
 
-		if item_ref.item_type == ItemData.ItemType.CONSUMABLE and item_ref.area_radius <= 0:
-			# Use self consumable: heal or cure
+		if item_ref.item_id == "mortar_and_pestle":
+			var bus = _get_event_bus()
+			if bus and bus.has_signal("crafting_modal_requested"):
+				bus.emit_signal("crafting_modal_requested")
+			return {"success": true, "message": "Opened Mortar and Pestle."}
+
+		if target_cell != Vector2i(-1, -1):
+			# Throw item at target cell
+			item_ref.quantity -= 1
+			if item_ref.quantity <= 0:
+				inv.remove_item(item_ref)
+				clear_slot(slot_idx)
+			refresh_hotbar()
+
+			var skills_comp = player.get_node_or_null("SkillComponent") as SkillComponent
+			if skills_comp and p_stats and p_stats.attributes:
+				skills_comp.train_skill(SkillData.SkillId.THROWING, 20.0, p_stats.attributes)
+
+			if item_ref.has_meta("is_potion") or item_ref.tags.has("potion") or item_ref.item_id.begins_with("potion_"):
+				var p_id = item_ref.get_meta("potion_id") as String if item_ref.has_meta("potion_id") else item_ref.item_id
+				var target_ent = grid.get_occupant(target_cell) if grid else null
+				var res = AlchemyCatalog.apply_potion_effect(target_ent, p_id, false)
+				emit_signal("hotbar_action_executed", slot_idx, "throw", res)
+				return res
+			else:
+				var combat_comp = player.get_node_or_null("CombatComponent") as CombatComponent
+				if combat_comp:
+					var r_res = combat_comp.execute_ranged_attack(player.grid_pos, target_cell, grid, null, item_ref)
+					emit_signal("hotbar_action_executed", slot_idx, "throw", r_res)
+					return r_res
+				return {"success": true, "message": "Threw %s at target." % it_name}
+
+		# Direct usage on self (target_cell == -1, -1)
+		if item_ref.has_meta("is_potion") or item_ref.tags.has("potion") or item_ref.item_id.begins_with("potion_"):
+			var p_id = item_ref.get_meta("potion_id") as String if item_ref.has_meta("potion_id") else item_ref.item_id
+			var res = AlchemyCatalog.apply_potion_effect(player, p_id, true)
+			item_ref.quantity -= 1
+			if item_ref.quantity <= 0:
+				inv.remove_item(item_ref)
+				clear_slot(slot_idx)
+			refresh_hotbar()
+			emit_signal("hotbar_action_executed", slot_idx, "consumable", res)
+			return res
+
+		var is_bandage = (
+			item_ref.item_id.contains("bandage") or
+			item_ref.item_id.contains("trauma") or
+			item_ref.item_id.contains("medpack") or
+			item_ref.item_id.contains("survival")
+		)
+		if is_bandage:
+			var heal_amt = 40 if (item_ref.item_id.contains("trauma") or item_ref.item_id.contains("medpack") or item_ref.item_id.contains("survival")) else 20
+			if p_stats:
+				p_stats.heal(float(heal_amt))
+			if player.has_node("StatusEffectComponent"):
+				var sec = player.get_node("StatusEffectComponent") as StatusEffectComponent
+				if sec:
+					sec.cure_bleed()
+			item_ref.quantity -= 1
+			if item_ref.quantity <= 0:
+				inv.remove_item(item_ref)
+				clear_slot(slot_idx)
+			refresh_hotbar()
+			var msg = "Applied %s (+%d HP restored, Bleed cured)!" % [it_name, heal_amt]
+			emit_signal("hotbar_action_executed", slot_idx, "consumable", {"success": true, "message": msg})
+			return {"success": true, "message": msg}
+
+		elif item_ref.item_type == ItemData.ItemType.CONSUMABLE and item_ref.area_radius <= 0:
 			var heal_amt = 25
 			if p_stats:
-				p_stats.current_hp = minf(p_stats.current_hp + heal_amt, p_stats.attributes.get_max_health())
+				p_stats.heal(float(heal_amt))
 			item_ref.quantity -= 1
 			if item_ref.quantity <= 0:
 				inv.remove_item(item_ref)
@@ -284,13 +451,40 @@ func trigger_slot(slot_idx: int, target_cell: Vector2i = Vector2i(-1, -1)) -> Di
 			emit_signal("hotbar_action_executed", slot_idx, "consumable", {"success": true, "message": msg})
 			return {"success": true, "message": msg}
 
-
 		elif requires_manual_targeting(slot_idx):
 			if item_ref.quantity <= 0:
 				clear_slot(slot_idx)
 				return {"success": false, "message": "Out of %s!" % it_name}
 
-			if target_cell == Vector2i(-1, -1):
+			var ctx = get_slot_targeting_context(slot_idx)
+			emit_signal("targeting_requested", slot_idx, ctx)
+			return {
+				"success": false,
+				"requires_targeting": true,
+				"slot_index": slot_idx,
+				"context": ctx,
+				"message": "Aiming %s — Select a tile [LMB/Enter to confirm, RMB/Esc to cancel]." % it_name
+			}
+
+	elif s.slot_type == SlotType.WEAPON_ABILITY:
+		var combat_comp = player.get_node_or_null("CombatComponent") as CombatComponent
+		var skills_comp = player.get_node_or_null("SkillComponent") as SkillComponent
+		if not combat_comp or not s.weapon_ability or not s.source_weapon:
+			return {"success": false, "message": "Weapon ability unavailable"}
+
+		if skills_comp and not skills_comp.is_weapon_ability_unlocked(s.source_weapon):
+			return {
+				"success": false,
+				"message": "Requires %s Level %.0f!" % [SkillData.get_skill_name(s.source_weapon.associated_skill_id), s.weapon_ability.required_skill_level]
+			}
+
+		var cd = combat_comp.get_ability_cooldown(s.weapon_ability.ability_id)
+		if cd > 0:
+			return {"success": false, "message": "%s is on cooldown (%d turns)" % [s.weapon_ability.ability_name, cd]}
+
+		var resolved_target: Vector2i = target_cell
+		if resolved_target == Vector2i(-1, -1):
+			if requires_manual_targeting(slot_idx):
 				var ctx = get_slot_targeting_context(slot_idx)
 				emit_signal("targeting_requested", slot_idx, ctx)
 				return {
@@ -298,17 +492,43 @@ func trigger_slot(slot_idx: int, target_cell: Vector2i = Vector2i(-1, -1)) -> Di
 					"requires_targeting": true,
 					"slot_index": slot_idx,
 					"context": ctx,
-					"message": "Aiming %s — Select a tile [LMB/Enter to confirm, RMB/Esc to cancel]." % it_name
+					"message": "Aiming %s — Select a tile [LMB/Enter to confirm, RMB/Esc to cancel]." % s.weapon_ability.ability_name
 				}
+			# For adjacent melee ability, check facing tile first, then any adjacent enemy
+			var p_pos: Vector2i = player.get("grid_pos") if "grid_pos" in player else Vector2i.ZERO
+			var facing: Vector2i = player.get("facing_direction") if "facing_direction" in player else Vector2i(0, 1)
+			if grid and grid.is_occupied(p_pos + facing) and grid.get_occupant(p_pos + facing) != player:
+				resolved_target = p_pos + facing
+			elif grid:
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						if dx == 0 and dy == 0:
+							continue
+						var cand = p_pos + Vector2i(dx, dy)
+						if grid.is_occupied(cand) and grid.get_occupant(cand) != player:
+							resolved_target = cand
+							break
+					if resolved_target != Vector2i(-1, -1):
+						break
 
-			var combat_comp = player.get_node_or_null("CombatComponent") as CombatComponent
-			if combat_comp:
-				var r_res = combat_comp.execute_ranged_attack(player.grid_pos, target_cell, grid, null, item_ref)
-				if item_ref.quantity <= 0:
-					clear_slot(slot_idx)
-				refresh_hotbar()
-				emit_signal("hotbar_action_executed", slot_idx, "throw", r_res)
-				return r_res
+		if resolved_target == Vector2i(-1, -1):
+			var ctx = get_slot_targeting_context(slot_idx)
+			emit_signal("targeting_requested", slot_idx, ctx)
+			return {
+				"success": false,
+				"requires_targeting": true,
+				"slot_index": slot_idx,
+				"context": ctx,
+				"message": "Select a target tile for %s." % s.weapon_ability.ability_name
+			}
+
+		var p_origin: Vector2i = player.get("grid_pos") if "grid_pos" in player else Vector2i.ZERO
+		var ab_res = combat_comp.execute_weapon_ability(s.source_weapon, p_origin, resolved_target, grid)
+		if not ab_res.get("success", false):
+			ab_res["message"] = ab_res.get("reason", "Failed to use %s" % s.weapon_ability.ability_name)
+		refresh_hotbar()
+		emit_signal("hotbar_action_executed", slot_idx, "weapon_ability", ab_res)
+		return ab_res
 
 	return {"success": false, "message": "Unknown hotbar action"}
 
@@ -319,4 +539,12 @@ func _on_slot_button_pressed(slot_idx: int) -> void:
 			world.trigger_hotbar_slot(slot_idx)
 			return
 	trigger_slot(slot_idx)
+
+func _get_event_bus() -> Node:
+	var loop = Engine.get_main_loop()
+	if loop is SceneTree:
+		return (loop as SceneTree).root.get_node_or_null("EventBus")
+	return null
+
+
 

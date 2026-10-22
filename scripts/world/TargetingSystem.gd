@@ -10,7 +10,9 @@ enum ActionMode {
 	NONE,
 	RANGED_WEAPON,
 	SPELL,
-	THROWN_ITEM
+	THROWN_ITEM,
+	COMPANION_ATTACK_TARGET,
+	TAME_BEAST
 }
 
 enum BlockerType {
@@ -308,6 +310,34 @@ func update_cursor(new_cell: Vector2i) -> void:
 	if cursor_cell == origin and not allow_self and area_radius == 0:
 		current_lof["is_valid"] = false
 		current_lof["status_text"] = "Select a target tile (Cannot target self)"
+
+	var mode = int(active_context.get("mode", ActionMode.NONE))
+	if mode == ActionMode.TAME_BEAST:
+		var target_ent = current_lof.get("target_entity")
+		if not target_ent and grid and grid.is_occupied(cursor_cell):
+			target_ent = grid.get_occupant(cursor_cell)
+		if target_ent and is_instance_valid(target_ent) and current_lof.get("is_valid", false):
+			if CombatComponent.is_beast_eligible(target_ent):
+				var floor_num = int(active_context.get("floor_num", 1))
+				var chance = CombatComponent.calculate_tame_chance(player, target_ent, floor_num)
+				var e_name = target_ent.get("enemy_name") if "enemy_name" in target_ent else target_ent.name
+				current_lof["status_text"] = "Target: %s  •  [Tame Chance: %d%%]" % [e_name, int(round(chance * 100.0))]
+				current_lof["is_valid"] = true
+			else:
+				current_lof["status_text"] = "Target is not a wild beast!"
+				current_lof["is_valid"] = false
+		elif current_lof.get("is_valid", false):
+			current_lof["status_text"] = "Aiming at (%d, %d) [Select a Wild Beast]" % [cursor_cell.x, cursor_cell.y]
+	elif mode == ActionMode.COMPANION_ATTACK_TARGET:
+		var target_ent = current_lof.get("target_entity")
+		if not target_ent and grid and grid.is_occupied(cursor_cell):
+			target_ent = grid.get_occupant(cursor_cell)
+		if target_ent and is_instance_valid(target_ent) and target_ent != player and not (target_ent is Companion and target_ent.is_hired):
+			var t_name = target_ent.get("enemy_name") if "enemy_name" in target_ent else target_ent.name
+			current_lof["status_text"] = "Command Squad Focus: %s" % t_name
+			current_lof["is_valid"] = true
+		elif current_lof.get("is_valid", false):
+			current_lof["status_text"] = "Aiming at (%d, %d) [Select Enemy for Focus]" % [cursor_cell.x, cursor_cell.y]
 
 	emit_signal("cursor_updated", cursor_cell, current_lof)
 	var bus = _get_event_bus()

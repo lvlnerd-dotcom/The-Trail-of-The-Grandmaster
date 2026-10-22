@@ -19,6 +19,7 @@ var is_moving: bool = false
 var move_tween: Tween = null
 
 @onready var visual_sprite: CanvasItem = get_node_or_null("VisualSprite")
+var status_effects: StatusEffectComponent = null
 
 func _get_event_bus() -> Node:
     var loop = Engine.get_main_loop()
@@ -29,6 +30,12 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
     # Disable default Godot physics processing since movement is turn-based on a grid
     set_physics_process(false)
+    if not status_effects:
+        status_effects = get_node_or_null("StatusEffectComponent") as StatusEffectComponent
+        if not status_effects:
+            status_effects = StatusEffectComponent.new()
+            status_effects.name = "StatusEffectComponent"
+            add_child(status_effects)
 
 func init_grid_position(p_grid: DungeonGrid, p_pos: Vector2i, p_turn_manager: TurnManager = null) -> void:
     grid = p_grid

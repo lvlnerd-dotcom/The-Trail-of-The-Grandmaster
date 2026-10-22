@@ -28,6 +28,19 @@ extends Node2D
 @onready var inspector_panel: InspectorPanel = get_node_or_null("UILayer/InspectorPanel") as InspectorPanel
 @onready var decals_layer: DecalsLayer = get_node_or_null("DecalsLayer") as DecalsLayer
 
+const ShopModal = preload("res://scripts/ui/ShopModal.gd")
+const Merchant = preload("res://scripts/entities/Merchant.gd")
+const CompanionCommandBar = preload("res://scripts/ui/CompanionCommandBar.gd")
+const Companion = preload("res://scripts/entities/Companion.gd")
+
+@onready var companion_command_bar: CompanionCommandBar = get_node_or_null("UILayer/CompanionCommandBar") as CompanionCommandBar
+var unhired_mercenaries: Array[Companion] = []
+
+@onready var loot_pickup_modal: LootPickupModal = get_node_or_null("UILayer/LootPickupModal") as LootPickupModal
+@onready var shop_modal: ShopModal = get_node_or_null("UILayer/ShopModal") as ShopModal
+@onready var alchemy_crafting_modal: AlchemyCraftingModal = get_node_or_null("UILayer/AlchemyCraftingModal") as AlchemyCraftingModal
+const AlchemyCraftingModalScene = preload("res://scenes/ui/menus/AlchemyCraftingModal.tscn")
+
 var inspection_controller: HoverInspectionController = null
 var targeting_system: TargetingSystem = null
 var targeting_overlay: TargetingOverlay = null
@@ -36,15 +49,21 @@ var _last_targeting_mouse_cell: Vector2i = Vector2i(-1, -1)
 const PLAYER_SCENE = preload("res://scenes/entities/player/Player.tscn")
 const ENEMY_SCENE = preload("res://scenes/entities/enemies/Enemy.tscn")
 const BOSS_SCENE = preload("res://scenes/entities/enemies/GrandmasterBoss.tscn")
+const MERCHANT_SCENE = preload("res://scenes/entities/merchant/Merchant.tscn")
 const FLOATING_TEXT_SCENE = preload("res://scenes/ui/components/FloatingCombatText.tscn")
 
 var player: Player = null
 var enemies: Array[Enemy] = []
+var merchants: Array[Merchant] = []
 var secret_doors: Array[SecretDoor] = []
 var traps: Dictionary = {} # Vector2i -> Trap
 var stairs_down: StairsDown = null
+var shrines: Array[Shrine] = []
+var chests: Array[TreasureChest] = []
+var world_items: Array[WorldItem] = []
 
 var current_floor: int = 1
+var active_biome: BiomeData = null
 var generator: DungeonGenerator = null
 var enemies_killed_count: int = 0
 var is_game_over: bool = false
@@ -75,6 +94,8 @@ func _ready() -> void:
 		)
 	if inspector_panel and hotbar_bar:
 		inspector_panel.sync_with_hotbar(hotbar_bar)
+	if companion_command_bar:
+		companion_command_bar.setup(turn_manager, player, targeting_system)
 	_update_hud()
 
 func _process(_delta: float) -> void:
@@ -87,24 +108,57 @@ func _process(_delta: float) -> void:
 func _generate_and_setup_floor(floor_num: int) -> void:
 	current_floor = floor_num
 	
-	# 1. Clean up existing objects and enemies
+	# 1. Clean up existing objects and enemies (preserve living squad companions)
 	for c in dungeon_objects.get_children():
+		if c is Companion and turn_manager.registered_companions.has(c) and not c.is_dead:
+			continue
 		c.queue_free()
+	for m in unhired_mercenaries:
+		if is_instance_valid(m) and not m.is_hired:
+			m.queue_free()
+	unhired_mercenaries.clear()
 	for e in enemies:
 		if is_instance_valid(e):
 			e.queue_free()
 	enemies.clear()
 	secret_doors.clear()
 	traps.clear()
+	shrines.clear()
+	chests.clear()
+	world_items.clear()
 	turn_manager.registered_enemies.clear()
+	for m in merchants:
+		if is_instance_valid(m):
+			m.queue_free()
+	merchants.clear()
 	if decals_layer:
 		decals_layer.clear_decals()
 	
 	# 2. Procedural Dungeon Generation
-	var gen_result = generator.generate_dungeon(grid, floor_num)
+	var active_deity = ""
+	if player:
+		if "active_shrine_covenant" in player and player.active_shrine_covenant is Dictionary:
+			active_deity = str(player.active_shrine_covenant.get("deity_id", ""))
+		elif player.has_meta("active_shrine_covenant"):
+			active_deity = str(player.get_meta("active_shrine_covenant").get("deity_id", ""))
+	var mm = _get_meta_mgr()
+	var betrayed: Array[String] = []
+	if mm and "profile" in mm and mm.profile:
+		betrayed = mm.profile.betrayed_deities
+	var gen_result = generator.generate_dungeon(grid, floor_num, -1, active_deity, betrayed)
+	
+	# Retrieve run-locked active biome for current floor
+	var gm = _get_game_mgr()
+	if gm and gm.has_method("get_biome_for_floor"):
+		active_biome = gm.get_biome_for_floor(floor_num)
+	if not active_biome:
+		active_biome = BiomeData.get_all_biomes()[0]
+		
 	if fow_system:
 		fow_system.init_fog(grid.grid_width, grid.grid_height)
 	grid_visualizer.setup(grid, fow_system)
+	if grid_visualizer.has_method("apply_biome_colors"):
+		grid_visualizer.apply_biome_colors(active_biome)
 	if targeting_overlay:
 		targeting_overlay.setup(grid, fow_system)
 	if inspection_controller:
@@ -118,7 +172,26 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 	if targeting_system:
 		targeting_system.setup(player, grid, turn_manager, fow_system)
 
-		
+	# Relocate living squad companions onto walkable cells adjacent to player start_cell
+	var spawn_dirs = [
+		Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1),
+		Vector2i(0, -2), Vector2i(0, 2), Vector2i(-2, 0), Vector2i(2, 0)
+	]
+	var dir_idx = 0
+	for comp in turn_manager.registered_companions:
+		if is_instance_valid(comp) and not comp.is_dead:
+			var placed = false
+			while dir_idx < spawn_dirs.size():
+				var cand = gen_result["start_cell"] + spawn_dirs[dir_idx]
+				dir_idx += 1
+				if grid.can_enter(cand):
+					comp.init_grid_position(grid, cand, turn_manager)
+					placed = true
+					break
+			if not placed:
+				comp.init_grid_position(grid, gen_result["start_cell"], turn_manager)
+
 	# Hook camera to collapse manager
 	if player and player.camera:
 		collapse_manager.camera = player.camera
@@ -140,10 +213,30 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 		for t_info in gen_result["traps"]:
 			_spawn_trap(t_info["cell"], t_info["trap_type"], t_info["hide_rating"])
 			
+		for s_info in gen_result.get("shrines", []):
+			_spawn_shrine(s_info["cell"], s_info["deity_id"])
+			
+		for c_info in gen_result.get("chests", []):
+			_spawn_chest(c_info)
+			
+		for l_info in gen_result.get("floor_loot", []):
+			_spawn_floor_item(l_info["cell"], l_info["items"])
+			
+		for m_info in gen_result.get("merchant_spawns", []):
+			_spawn_merchant(m_info)
+			
+		for merc_info in gen_result.get("mercenary_spawns", []):
+			_spawn_mercenary(merc_info)
+			
 		_spawn_procedural_enemies(gen_result["enemy_spawns"], floor_num)
 		
-		label_title.text = "TRAIL OF THE GRANDMASTER  |  Floor %d  |  Phase 7: End-Game" % floor_num
-		label_log.text = "Floor %d entered! Find the exit stairs before the floor collapses!" % floor_num
+		# Spawn Floor Milestone Mini-Boss (Floors 4, 8, 12, 16) in exit room
+		var boss_cell = gen_result.get("mini_boss_spawn", Vector2i.ZERO) as Vector2i
+		if boss_cell != Vector2i.ZERO and active_biome and active_biome.mini_boss_id != "":
+			_spawn_mini_boss(boss_cell, floor_num, active_biome)
+		
+		label_title.text = "TRAIL OF THE GRANDMASTER  |  Floor %d: %s" % [floor_num, active_biome.biome_name if active_biome else "Dungeon"]
+		label_log.text = "Floor %d: %s entered! %s" % [floor_num, active_biome.biome_name if active_biome else "", active_biome.environmental_rule_desc if active_biome else ""]
 		var am = _get_audio_mgr()
 		if am:
 			am.play_ambient("ambient_dungeon")
@@ -152,6 +245,24 @@ func _generate_and_setup_floor(floor_num: int) -> void:
 	turn_manager.init_floor_timer(floor_num, grid.walkable_cells.size())
 	collapse_manager.current_stage = FloorCollapseManager.CollapseStage.STABLE
 	update_fog_and_cull_entities()
+	if companion_command_bar:
+		companion_command_bar.refresh()
+
+func _spawn_mercenary(info: Dictionary) -> void:
+	var cell = info.get("cell", Vector2i.ZERO) as Vector2i
+	var data = info.get("companion_data") as CompanionData
+	if not data:
+		var t = int(info.get("depth_tier", 1))
+		data = CompanionData.create_mercenary_for_tier(t)
+		
+	var comp = Companion.new()
+	comp.is_hired = false
+	if dungeon_objects:
+		dungeon_objects.add_child(comp)
+	else:
+		add_child(comp)
+	comp.setup(data, player, turn_manager, grid, cell)
+	unhired_mercenaries.append(comp)
 
 func _spawn_grandmaster_boss(spawn_cell: Vector2i) -> void:
 	var boss = BOSS_SCENE.instantiate() as GrandmasterBoss
@@ -166,6 +277,7 @@ func _spawn_grandmaster_boss(spawn_cell: Vector2i) -> void:
 			var mm = _get_meta_mgr()
 			if mm:
 				mm.record_kill(boss.enemy_name)
+			_on_enemy_slain_drop_loot(boss)
 		)
 	enemies.append(boss)
 
@@ -187,8 +299,13 @@ func _spawn_player(spawn_cell: Vector2i) -> void:
 		player.combat.floating_text_requested.connect(_on_floating_text_requested)
 	if player.stats:
 		player.stats.entity_died.connect(_on_player_died)
+	if player.skills:
+		if not player.skills.defensive_mode_changed.is_connected(_on_player_defensive_mode_changed):
+			player.skills.defensive_mode_changed.connect(_on_player_defensive_mode_changed)
 	if hotbar_bar:
 		hotbar_bar.setup(player)
+		if player.inventory:
+			player.inventory.item_equipped.connect(func(_slot, _item): hotbar_bar.sync_weapon_abilities())
 
 func _spawn_stairs(exit_cell: Vector2i) -> void:
 	stairs_down = StairsDown.new()
@@ -208,20 +325,195 @@ func _spawn_trap(trap_cell: Vector2i, trap_type: int, hide_rating: float) -> voi
 	trap.setup(grid, trap_cell, trap_type as Trap.TrapType, hide_rating)
 	traps[trap_cell] = trap
 
+func _spawn_shrine(cell: Vector2i, deity_id: String) -> Shrine:
+	var shrine = Shrine.new()
+	dungeon_objects.add_child(shrine)
+	var s_data = ShrineData.create_by_deity_id(deity_id)
+	shrine.setup(s_data, grid, cell)
+	shrines.append(shrine)
+	return shrine
+
+func _spawn_chest(c_info: Dictionary) -> TreasureChest:
+	var chest = TreasureChest.new()
+	dungeon_objects.add_child(chest)
+	var contents: Array[ItemData] = []
+	if c_info.has("contents") and c_info["contents"] is Array:
+		for it in c_info["contents"]:
+			if it is ItemData:
+				contents.append(it)
+	chest.setup(
+		grid,
+		c_info["cell"],
+		contents,
+		c_info.get("is_locked", false),
+		c_info.get("is_trapped", false),
+		c_info.get("hardness", 3.0),
+		c_info.get("hp", 30.0)
+	)
+	if c_info.has("lock_difficulty"):
+		chest.lock_difficulty = float(c_info["lock_difficulty"])
+	if c_info.has("trap_difficulty"):
+		chest.trap_difficulty = float(c_info["trap_difficulty"])
+	chests.append(chest)
+	return chest
+
+func _spawn_floor_item(cell: Vector2i, item_or_items: Variant) -> WorldItem:
+	var existing = get_world_item_at(cell)
+	if existing:
+		if item_or_items is Array:
+			for it in item_or_items:
+				if it is ItemData:
+					existing.add_item(it)
+		elif item_or_items is ItemData:
+			existing.add_item(item_or_items)
+		return existing
+	else:
+		var wi = WorldItem.new()
+		dungeon_objects.add_child(wi)
+		wi.setup(grid, cell, item_or_items)
+		world_items.append(wi)
+		return wi
+
+func get_world_item_at(cell: Vector2i) -> WorldItem:
+	if not dungeon_objects:
+		return null
+	for child in dungeon_objects.get_children():
+		if child is WorldItem and child.grid_pos == cell:
+			return child
+	return null
+
+func get_chest_at(cell: Vector2i) -> TreasureChest:
+	if not dungeon_objects:
+		return null
+	for child in dungeon_objects.get_children():
+		if child is TreasureChest and child.grid_pos == cell:
+			return child
+	return null
+
+func _on_player_item_dropped(item: ItemData) -> void:
+	if player:
+		_spawn_floor_item(player.grid_pos, item)
+		_spawn_floating_text("Dropped %s" % item.item_name, Color(0.8, 0.8, 0.8), player.global_position)
+		if label_log:
+			label_log.text = "Dropped %s on the ground." % item.item_name
+		_update_hud()
+
+func _on_enemy_slain_drop_loot(enemy: Node2D) -> void:
+	var roll = randf()
+	var is_boss = (enemy.get("is_mini_boss") == true) or (enemy is GrandmasterBoss)
+	var is_elite = (enemy.get("is_elite") == true) or is_boss
+	if is_elite or roll <= 0.35:
+		var death_cell: Vector2i = enemy.grid_pos if "grid_pos" in enemy else Vector2i.ZERO
+		var dropped_items: Array[ItemData] = []
+		if is_elite:
+			var gold_val = 60 + current_floor * 25
+			var pouch = ItemData.new("gold_pouch", "Rich Gold Pouch (%d GP)" % gold_val, ItemData.ItemType.VALUABLE, ItemData.EquipSlot.NONE, 0.5)
+			pouch.base_value_gold = gold_val
+			var pot = ItemData.new("potion_heal", "Elixir of Vitality", ItemData.ItemType.CONSUMABLE, ItemData.EquipSlot.NONE, 0.5)
+			pot.is_fragile = true
+			dropped_items.append(pouch)
+			dropped_items.append(pot)
+			
+			# 100% equipment drop on death for elites & mini-bosses
+			var equip_item: ItemData = null
+			if "inventory" in enemy and enemy.inventory:
+				var w = enemy.inventory.get_equipped_weapon()
+				if w and w.item_id != "crude_blade":
+					equip_item = w
+			if not equip_item:
+				equip_item = WeaponManifest.create_weapon("sword_broad")
+			if equip_item:
+				dropped_items.append(equip_item)
+		else:
+			if randf() < 0.60:
+				var gold_val = 10 + current_floor * 5
+				var pouch = ItemData.new("gold_pouch", "Gold Pouch (%d GP)" % gold_val, ItemData.ItemType.VALUABLE, ItemData.EquipSlot.NONE, 0.5)
+				pouch.base_value_gold = gold_val
+				dropped_items.append(pouch)
+			else:
+				var pot = ItemData.new("potion_heal", "Minor Health Draught", ItemData.ItemType.CONSUMABLE, ItemData.EquipSlot.NONE, 0.5)
+				pot.is_fragile = true
+				dropped_items.append(pot)
+		_spawn_floor_item(death_cell, dropped_items)
+
+func _handle_pickup_or_interact_action() -> void:
+	if not player:
+		return
+	var p_cell = player.grid_pos
+
+	# Check adjacent unhired mercenaries
+	var dirs = [Vector2i.ZERO, Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+	for d in dirs:
+		var check = p_cell + d
+		if grid and grid.is_occupied(check):
+			var occ = grid.get_occupant(check)
+			if occ is Companion and not occ.is_hired:
+				var res = occ.attempt_hire(player)
+				if label_log:
+					label_log.text = res.get("message", res.get("reason", ""))
+				if companion_command_bar:
+					companion_command_bar.refresh()
+				_update_hud()
+				return
+
+	var chest = get_chest_at(p_cell)
+	if chest:
+		_open_loot_modal_for_chest(chest)
+		return
+		
+	var w_item = get_world_item_at(p_cell)
+	if w_item:
+		if w_item.items.size() == 1:
+			var item = w_item.items[0]
+			player.inventory.add_item(item)
+			w_item.queue_free()
+			world_items.erase(w_item)
+			_spawn_floating_text("+%s" % item.item_name, Color(0.4, 1.0, 0.5), player.global_position)
+			if label_log:
+				label_log.text = "[Floor Loot] Picked up %s." % item.item_name
+			_update_hud()
+		elif w_item.items.size() > 1:
+			_open_loot_modal_for_world_item(w_item)
+		return
+		
+	if label_log:
+		label_log.text = "Nothing here to pick up."
+
+func _open_loot_modal_for_world_item(world_item: WorldItem) -> void:
+	if not loot_pickup_modal:
+		var scene = load("res://scenes/ui/menus/LootPickupModal.tscn")
+		if scene:
+			loot_pickup_modal = scene.instantiate() as LootPickupModal
+			$UILayer.add_child(loot_pickup_modal)
+	if loot_pickup_modal:
+		loot_pickup_modal.open_modal_with_world_item(world_item, player)
+
+func _open_loot_modal_for_chest(chest: TreasureChest) -> void:
+	if not loot_pickup_modal:
+		var scene = load("res://scenes/ui/menus/LootPickupModal.tscn")
+		if scene:
+			loot_pickup_modal = scene.instantiate() as LootPickupModal
+			$UILayer.add_child(loot_pickup_modal)
+	if loot_pickup_modal:
+		loot_pickup_modal.open_modal_with_chest(chest, player)
+
 func _spawn_procedural_enemies(spawn_cells: Array[Vector2i], floor_num: int) -> void:
 	for cell in spawn_cells:
 		var enemy = ENEMY_SCENE.instantiate() as Enemy
 		entities_container.add_child(enemy)
 		enemy.init_grid_position(grid, cell, turn_manager)
 		
-		# Enemy variant based on floor
-		var is_skeleton = randf() < 0.4
-		if is_skeleton:
-			var skel_hp = 22.0 + floor_num * 3.0
-			enemy.setup_enemy("Skeleton Guard", skel_hp, 45 + floor_num * 5, 9 + floor_num, 7 + floor_num)
-		else:
-			var gob_hp = 16.0 + floor_num * 2.5
-			enemy.setup_enemy("Dungeon Goblin", gob_hp, 35 + floor_num * 5, 7 + floor_num, 9 + floor_num)
+		# Pull monster template from active biome
+		var template: Dictionary = {}
+		if active_biome:
+			template = BestiaryCatalog.get_random_monster_for_biome(active_biome)
+		if template.is_empty():
+			template = BestiaryCatalog.get_monster_template("skeleton_sentry")
+			
+		var is_elite = (randf() <= 0.08)
+		var affix = BestiaryCatalog.roll_elite_affix() if is_elite else ""
+		
+		enemy.setup_from_template(template, floor_num, is_elite, affix)
 			
 		turn_manager.register_enemy(enemy)
 		if enemy.combat:
@@ -232,8 +524,58 @@ func _spawn_procedural_enemies(spawn_cells: Array[Vector2i], floor_num: int) -> 
 				var mm = _get_meta_mgr()
 				if mm:
 					mm.record_kill(enemy.enemy_name)
+				_on_enemy_slain_drop_loot(enemy)
 			)
 		enemies.append(enemy)
+
+func _spawn_mini_boss(spawn_cell: Vector2i, floor_num: int, biome: BiomeData) -> Enemy:
+	var enemy = ENEMY_SCENE.instantiate() as Enemy
+	entities_container.add_child(enemy)
+	enemy.init_grid_position(grid, spawn_cell, turn_manager)
+	
+	var boss_id = biome.mini_boss_id if (biome and biome.mini_boss_id != "") else "crypt_lord_malgok"
+	var template = BestiaryCatalog.get_monster_template(boss_id)
+	if template.is_empty():
+		template = BestiaryCatalog.get_monster_template("crypt_lord_malgok")
+		
+	enemy.setup_from_template(template, floor_num, false, "")
+	enemy.is_mini_boss = true
+	
+	turn_manager.register_enemy(enemy)
+	if enemy.combat:
+		enemy.combat.floating_text_requested.connect(_on_floating_text_requested)
+	if enemy.stats:
+		enemy.stats.entity_died.connect(func(_victim):
+			enemies_killed_count += 1
+			var mm = _get_meta_mgr()
+			if mm:
+				mm.record_kill(enemy.enemy_name)
+			_on_enemy_slain_drop_loot(enemy)
+		)
+	enemies.append(enemy)
+	return enemy
+
+func _spawn_merchant(m_info: Dictionary) -> Merchant:
+	var merchant = MERCHANT_SCENE.instantiate() as Merchant
+	entities_container.add_child(merchant)
+	var cell: Vector2i = m_info.get("cell", Vector2i.ZERO)
+	var depth_tier = int(m_info.get("depth_tier", 1))
+	merchant.setup(null, grid, cell, turn_manager, m_info.get("merchant_info", {}), depth_tier, current_floor)
+	
+	if merchant.stats:
+		merchant.stats.entity_died.connect(func(_victim):
+			merchant.drop_inventory_loot()
+			if enemies.has(merchant):
+				enemies.erase(merchant)
+			if merchants.has(merchant):
+				merchants.erase(merchant)
+		)
+	merchants.append(merchant)
+	return merchant
+
+func _on_shop_opened(merchant_node: Node2D, _shop_data: Resource) -> void:
+	if shop_modal and merchant_node is Merchant:
+		shop_modal.open_shop(merchant_node as Merchant, player, turn_manager.turn_number if turn_manager else 0)
 
 func _on_descent_requested(next_floor: int) -> void:
 	if is_game_over:
@@ -402,6 +744,8 @@ func _connect_signals() -> void:
 			bus.victory_achieved.connect(_on_victory_achieved)
 		if bus.has_signal("entity_damaged"):
 			bus.entity_damaged.connect(_on_entity_damaged_event)
+		if bus.has_signal("shop_opened"):
+			bus.shop_opened.connect(_on_shop_opened)
 			
 	if targeting_system:
 		targeting_system.cursor_updated.connect(_on_targeting_cursor_updated)
@@ -412,6 +756,47 @@ func _connect_signals() -> void:
 		if player.stats.attributes:
 			player.stats.attributes.attribute_changed.connect(func(_n, _v): _update_hud())
 			player.stats.attributes.leveled_up.connect(func(_lvl, _pts): _update_hud())
+	if player and player.skills:
+		if not player.skills.defensive_mode_changed.is_connected(_on_player_defensive_mode_changed):
+			player.skills.defensive_mode_changed.connect(_on_player_defensive_mode_changed)
+	if inventory_modal:
+		if not inventory_modal.item_dropped.is_connected(_on_player_item_dropped):
+			inventory_modal.item_dropped.connect(_on_player_item_dropped)
+		if not inventory_modal.item_thrown_requested.is_connected(_on_item_thrown_requested):
+			inventory_modal.item_thrown_requested.connect(_on_item_thrown_requested)
+		if not inventory_modal.crafting_modal_requested.is_connected(_on_crafting_modal_requested):
+			inventory_modal.crafting_modal_requested.connect(_on_crafting_modal_requested)
+
+func _on_crafting_modal_requested() -> void:
+	if not alchemy_crafting_modal and ui_layer:
+		alchemy_crafting_modal = AlchemyCraftingModalScene.instantiate() as AlchemyCraftingModal
+		alchemy_crafting_modal.name = "AlchemyCraftingModal"
+		ui_layer.add_child(alchemy_crafting_modal)
+	if alchemy_crafting_modal and player:
+		alchemy_crafting_modal.open_modal_with_player(player)
+
+func _on_item_thrown_requested(item: ItemData) -> void:
+	if not item or not targeting_system or not player:
+		return
+	var r_tiles = item.range_tiles if item.range_tiles > 1 else 5
+	var ctx = {
+		"mode": TargetingSystem.ActionMode.THROWN_ITEM,
+		"label": item.get_display_name() if item.has_method("get_display_name") else item.item_name,
+		"max_range": r_tiles,
+		"area_radius": item.area_radius,
+		"is_beam": false,
+		"is_teleport": false,
+		"allow_self": false,
+		"item": item
+	}
+	targeting_system.start_targeting(ctx)
+	_update_hud()
+
+func _on_player_defensive_mode_changed(new_mode: SkillComponent.DefensiveMode) -> void:
+	var mode_str = "DODGE" if new_mode == SkillComponent.DefensiveMode.DODGE_EVADE else "PARRY"
+	if label_log:
+		label_log.text = "Auto-switched Defensive Stance to: %s" % mode_str
+	_update_hud()
 
 func _on_targeting_cursor_updated(cursor_cell: Vector2i, lof_data: Dictionary) -> void:
 	if label_log and targeting_system and targeting_system.is_active:
@@ -535,6 +920,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			label_log.text = "Defensive Stance switched to: %s" % mode_str
 			_update_hud()
 			return
+
+		if key_event.keycode == KEY_G:
+			get_viewport().set_input_as_handled()
+			_handle_pickup_or_interact_action()
+			return
 			
 		if key_event.keycode == KEY_L or key_event.keycode == KEY_C:
 			get_viewport().set_input_as_handled()
@@ -571,6 +961,24 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					skills_modal.open_modal_with_player(player)
 			return
 
+		if key_event.keycode == KEY_T:
+			get_viewport().set_input_as_handled()
+			_start_beast_taming_targeting()
+			return
+
+		if key_event.keycode == KEY_V:
+			get_viewport().set_input_as_handled()
+			if companion_command_bar:
+				var new_ord = companion_command_bar.cycle_order()
+				var ord_name = "DEFEND"
+				match new_ord:
+					Companion.TacticalOrder.ALL_FOLLOW: ord_name = "ALL FOLLOW"
+					Companion.TacticalOrder.ALL_ATTACK: ord_name = "ALL ATTACK"
+					Companion.TacticalOrder.ALL_DEFEND: ord_name = "ALL DEFEND"
+				if label_log:
+					label_log.text = "Tactical Order: %s" % ord_name
+			return
+
 		# Hotbar keys 1 through 9, and 0
 		var hotbar_idx = -1
 		if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
@@ -582,6 +990,32 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			trigger_hotbar_slot(hotbar_idx)
 			return
+
+func _start_beast_taming_targeting() -> bool:
+	if not player or not targeting_system:
+		return false
+	if targeting_system.is_active:
+		_cancel_active_targeting()
+	var p_stats = player.get_node_or_null("StatsComponent") as StatsComponent
+	var attrs = p_stats.attributes if p_stats else null
+	var max_comp = attrs.get_max_companions() if attrs and attrs.has_method("get_max_companions") else 1
+	if turn_manager.registered_companions.size() >= max_comp:
+		if label_log:
+			label_log.text = "Beast Taming: Squad capacity full! (Max %d based on Charisma)" % max_comp
+		return false
+	var ctx = {
+		"mode": TargetingSystem.ActionMode.TAME_BEAST,
+		"label": "Tame Beast [Beast Mastery]",
+		"max_range": 4,
+		"area_radius": 0,
+		"is_beam": false,
+		"is_teleport": false,
+		"allow_self": false,
+		"floor_num": current_floor
+	}
+	var ok = targeting_system.start_targeting(ctx)
+	_update_hud()
+	return ok
 
 func start_ranged_weapon_targeting() -> bool:
 	if not player or not targeting_system:
@@ -641,6 +1075,15 @@ func _confirm_active_targeting() -> void:
 	if aim_delta != Vector2i.ZERO:
 		player.set_facing_direction(Vector2i(clampi(aim_delta.x, -1, 1), clampi(aim_delta.y, -1, 1)))
 
+	# Check if attacking a peaceful merchant
+	var target_occupant = grid.get_occupant(eff_pt) if grid else null
+	if target_occupant is Merchant and target_occupant.is_peaceful:
+		target_occupant.become_hostile(player, current_floor)
+		if not enemies.has(target_occupant):
+			enemies.append(target_occupant)
+		if label_log:
+			label_log.text = "You attacked %s! All merchants become deadly enemies!" % target_occupant.get_merchant_name()
+
 	var exec_res: Dictionary = {}
 	if ctx.has("slot_index") and int(ctx["slot_index"]) >= 0 and hotbar_bar:
 		exec_res = hotbar_bar.trigger_slot(int(ctx["slot_index"]), cursor_pt)
@@ -651,6 +1094,50 @@ func _confirm_active_targeting() -> void:
 	elif mode == TargetingSystem.ActionMode.SPELL and player.spell_casting:
 		var sp = ctx.get("spell") as SpellData
 		exec_res = player.spell_casting.cast_spell(sp, cursor_pt, grid)
+	elif mode == TargetingSystem.ActionMode.THROWN_ITEM:
+		var thrown_item = ctx.get("item") as ItemData
+		if thrown_item:
+			thrown_item.quantity -= 1
+			if thrown_item.quantity <= 0 and player and player.inventory:
+				player.inventory.remove_item(thrown_item)
+			if player and player.skills and player.stats and player.stats.attributes:
+				player.skills.train_skill(SkillData.SkillId.THROWING, 20.0, player.stats.attributes)
+			if thrown_item.has_meta("is_potion") or thrown_item.tags.has("potion") or thrown_item.item_id.begins_with("potion_"):
+				var p_id = thrown_item.get_meta("potion_id") as String if thrown_item.has_meta("potion_id") else thrown_item.item_id
+				var target_ent = grid.get_occupant(eff_pt) if grid else null
+				exec_res = AlchemyCatalog.apply_potion_effect(target_ent, p_id, false)
+			else:
+				exec_res = {"success": true, "message": "Threw %s at (%d, %d)." % [thrown_item.item_name, eff_pt.x, eff_pt.y]}
+		if hotbar_bar:
+			hotbar_bar.refresh_hotbar()
+	elif mode == TargetingSystem.ActionMode.COMPANION_ATTACK_TARGET:
+		var target_enemy = conf.get("lof", {}).get("target_entity", null)
+		if not target_enemy and grid:
+			target_enemy = grid.get_occupant(eff_pt)
+		if target_enemy and is_instance_valid(target_enemy):
+			for comp in turn_manager.registered_companions:
+				if is_instance_valid(comp) and comp is Companion:
+					comp.current_order = Companion.TacticalOrder.ALL_ATTACK
+					comp.designated_target = target_enemy
+			var e_name = target_enemy.get("enemy_name") if "enemy_name" in target_enemy else target_enemy.name
+			exec_res = {"success": true, "message": "Commanded squad to attack %s!" % e_name}
+			if companion_command_bar:
+				companion_command_bar.refresh()
+			if label_log:
+				label_log.text = exec_res["message"]
+			update_fog_and_cull_entities()
+			_update_hud()
+			return
+		else:
+			exec_res = {"success": false, "message": "No valid target selected for squad attack."}
+	elif mode == TargetingSystem.ActionMode.TAME_BEAST:
+		var target_enemy = conf.get("lof", {}).get("target_entity", null)
+		if not target_enemy and grid:
+			target_enemy = grid.get_occupant(eff_pt)
+		if target_enemy and is_instance_valid(target_enemy) and player.combat:
+			exec_res = player.combat.attempt_tame_beast(player, target_enemy, current_floor)
+			if companion_command_bar:
+				companion_command_bar.refresh()
 
 	var msg = exec_res.get("message", "Action executed at (%d, %d)!" % [eff_pt.x, eff_pt.y])
 	if label_log:
@@ -690,19 +1177,35 @@ func _update_hud() -> void:
 	var pts_alert = " | [LEVEL UP AVAILABLE: %d pts! Press L]" % attrs.unallocated_attribute_points if attrs.unallocated_attribute_points > 0 else ""
 	var class_tag = " | Class: %s" % player.get_meta("class_name") if player.has_meta("class_name") else ""
 	
-	label_vitals.text = "HP: %d/%d | Mana: %d/%d | Level: %d (%d/%d EXP) | Burden: %.1f/%.0f Stones | Stance: %s%s%s" % [
+	var is_burdened = player.inventory.is_overburdened(attrs.get_max_carry_weight_stones())
+	var burden_tag = " [OVERBURDENED]" if is_burdened else ""
+
+	var status_badges_str = ""
+	if player and player.has_node("StatusEffectComponent"):
+		var sec = player.get_node("StatusEffectComponent") as StatusEffectComponent
+		if sec:
+			status_badges_str = sec.get_hud_badge_string()
+	var status_tag = (" | " + status_badges_str) if status_badges_str != "" else ""
+	
+	label_vitals.text = "HP: %d/%d | Mana: %d/%d | Level: %d (%d/%d EXP) | Burden: %.1f/%.0f Stones%s | Stance: %s%s%s%s" % [
 		int(player.stats.current_hp), int(attrs.get_max_health()),
 		int(player.stats.current_mana), int(attrs.get_max_mana()),
 		attrs.character_level, attrs.current_exp, attrs.get_exp_required_for_next_level(),
 		player.inventory.get_carried_weight_stones(), attrs.get_max_carry_weight_stones(),
+		burden_tag,
 		stance_name,
 		class_tag,
-		pts_alert
+		pts_alert,
+		status_tag
 	]
 
 func _on_turn_started(_turn: int) -> void:
 	if player and player.stats:
 		player.stats.tick_turn_regeneration()
+	if player and player.combat:
+		player.combat.tick_cooldowns()
+	if hotbar_bar:
+		hotbar_bar.refresh_hotbar()
 	_update_hud()
 
 func _on_floor_turn_ticked(remaining: int, total: int) -> void:
@@ -750,6 +1253,10 @@ func update_fog_and_cull_entities() -> void:
 	for e in enemies:
 		if is_instance_valid(e):
 			e.visible = fow_system.is_visible(e.grid_pos)
+			
+	for m in merchants:
+		if is_instance_valid(m):
+			m.visible = fow_system.is_visible(m.grid_pos)
 
 func _on_entity_moved(entity: Node2D, _from_cell: Vector2i, to_cell: Vector2i) -> void:
 	if entity == player:
@@ -772,8 +1279,21 @@ func _on_entity_moved(entity: Node2D, _from_cell: Vector2i, to_cell: Vector2i) -
 				var bus = _get_event_bus()
 				if bus:
 					bus.emit_signal("trap_triggered", to_cell, player)
+
+		# 3. Check if stepped on a Treasure Chest
+		var chest_on_tile = get_chest_at(to_cell)
+		if chest_on_tile and label_log:
+			label_log.text = "[Treasure Chest] %s lies here. Press [G] to interact." % chest_on_tile.chest_name
+
+		# 4. Check if stepped on Floor Loot
+		var floor_loot_on_tile = get_world_item_at(to_cell)
+		if floor_loot_on_tile and label_log:
+			if floor_loot_on_tile.items.size() == 1:
+				label_log.text = "[Floor Loot] %s lies here. Press [G] to pick up." % floor_loot_on_tile.get_top_item().item_name
+			else:
+				label_log.text = "[Floor Loot] A pile of %d items lies here. Press [G] to inspect pile." % floor_loot_on_tile.items.size()
 					
-		# 3. Perform Perception Scan on nearby hidden objects
+		# 5. Perform Perception Scan on nearby hidden objects
 		_scan_environment_with_perception()
 	elif enemies.has(entity):
 		if fow_system:
@@ -814,6 +1334,18 @@ func _scan_environment_with_perception() -> void:
 						_spawn_floating_text("Trap Detected!", Color(1.0, 0.7, 0.2), trap.global_position)
 						player.skills.train_skill(SkillData.SkillId.PERCEPTION, trap.hide_rating, player.stats.attributes)
 
+	# Check hidden Traps on Chests
+	for chest in chests:
+		if is_instance_valid(chest) and chest.is_trapped and not chest.is_trap_revealed:
+			var dist = abs(chest.grid_pos.x - p_pos.x) + abs(chest.grid_pos.y - p_pos.y)
+			if dist <= max_scan_dist and (not fow_system or fow_system.is_visible(chest.grid_pos)):
+				if VisionComponent.has_line_of_sight(grid, p_pos, chest.grid_pos):
+					var det_chance = VisionComponent.calculate_detection_chance(player, chest)
+					if randf() <= det_chance:
+						chest.reveal_trap()
+						_spawn_floating_text("Trap Revealed on Chest!", Color(1.0, 0.4, 0.4), chest.global_position)
+						player.skills.train_skill(SkillData.SkillId.PERCEPTION, chest.hide_rating, player.stats.attributes)
+
 func _on_entity_bumped(entity: Node2D, target_cell: Vector2i) -> void:
 	if entity == player:
 		update_fog_and_cull_entities()
@@ -831,3 +1363,5 @@ func _on_skill_xp_gained(s_name: String, _amt: float, cur_lvl: float) -> void:
 
 func _on_keystone_unlocked(s_name: String, milestone: int) -> void:
 	label_log.text = "Keystone Unlocked! %s achieved milestone %d!" % [s_name, milestone]
+	if milestone == 25 and hotbar_bar:
+		hotbar_bar.sync_weapon_abilities()

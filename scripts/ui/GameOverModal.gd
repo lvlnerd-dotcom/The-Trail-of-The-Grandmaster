@@ -92,7 +92,13 @@ func open_modal(summary: Dictionary) -> void:
 func _get_game_mgr() -> Node:
     var loop = Engine.get_main_loop()
     if loop and loop is SceneTree:
-        return (loop as SceneTree).root.get_node_or_null("GameManager")
+        var root = (loop as SceneTree).root
+        var gm = root.get_node_or_null("GameManager")
+        if is_instance_valid(gm):
+            return gm
+        for child in root.get_children():
+            if is_instance_valid(child) and child.name.contains("GameManager"):
+                return child
     return null
 
 func close_modal() -> void:
@@ -105,7 +111,8 @@ func _on_restart_pressed() -> void:
     var gm = _get_game_mgr()
     if gm:
         gm.open_creation_on_main_menu = true
-    var tree = get_tree()
-    if tree:
-        tree.change_scene_to_file("res://scenes/ui/menus/MainMenu.tscn")
+    if is_inside_tree():
+        var tree = get_tree()
+        if tree:
+            tree.change_scene_to_file("res://scenes/ui/menus/MainMenu.tscn")
 

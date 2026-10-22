@@ -39,6 +39,18 @@ func pray(player: Node2D) -> Dictionary:
 	if is_activated:
 		return {"success": false, "reason": "Altar has already been exhausted"}
 		
+	# Check cross-run permanent betrayal in MetaProfileData
+	var loop = Engine.get_main_loop()
+	var mm = (loop as SceneTree).root.get_node_or_null("MetaManager") if loop and loop is SceneTree else null
+	if mm and "profile" in mm and mm.profile and mm.profile.is_deity_betrayed(shrine_data.deity_id):
+		return {"success": false, "reason": "%s refuses your prayers! Their wrath is eternal." % shrine_data.deity_name}
+		
+	# Check current run grudge
+	if player.has_meta("abandoned_deities"):
+		var abandoned = player.get_meta("abandoned_deities") as Array
+		if abandoned.has(shrine_data.deity_id):
+			return {"success": false, "reason": "%s turns away from you for breaking your covenant this run!" % shrine_data.deity_name}
+
 	var stats = player.get_node_or_null("StatsComponent") as StatsComponent
 	if not stats:
 		for child in player.get_children():
@@ -59,10 +71,37 @@ func pray(player: Node2D) -> Dictionary:
 		existing_covenant = player.get("active_shrine_covenant")
 	elif player.has_meta("active_shrine_covenant"):
 		existing_covenant = player.get_meta("active_shrine_covenant")
-	if existing_covenant is Dictionary and existing_covenant.has("deity_name"):
+		
+	if existing_covenant is Dictionary and existing_covenant.has("deity_id"):
+		var old_id = str(existing_covenant["deity_id"])
+		if old_id != shrine_data.deity_id:
+			var old_data = ShrineData.create_by_deity_id(old_id)
+			if old_data.apostasy_temperament == ShrineData.ApostasyTemperament.JEALOUS_UNFORGIVING:
+				if mm and "profile" in mm and mm.profile:
+					mm.profile.record_betrayed_deity(old_id)
+					if mm.has_method("save_meta_profile"):
+						mm.save_meta_profile()
+				player.set_meta("apostasy_debuff", {
+					"name": old_data.apostasy_debuff_name,
+					"turns": old_data.apostasy_debuff_turns,
+					"deity": old_id,
+					"description": old_data.apostasy_debuff_description
+				})
+			elif old_data.apostasy_temperament == ShrineData.ApostasyTemperament.VENGEFUL_GRUDGE:
+				var abandoned: Array = player.get_meta("abandoned_deities") if player.has_meta("abandoned_deities") else []
+				if not abandoned.has(old_id):
+					abandoned.append(old_id)
+				player.set_meta("abandoned_deities", abandoned)
+				player.set_meta("apostasy_debuff", {
+					"name": old_data.apostasy_debuff_name,
+					"turns": old_data.apostasy_debuff_turns,
+					"deity": old_id,
+					"description": old_data.apostasy_debuff_description
+				})
+				
 		var bus = _get_event_bus()
 		if bus:
-			bus.emit_signal("deity_covenant_broken", existing_covenant["deity_name"])
+			bus.emit_signal("deity_covenant_broken", existing_covenant.get("deity_name", old_id))
 			
 	var scaled_blessing = shrine_data.get_scaled_blessing(bonus_mult)
 	var scaled_taboo = shrine_data.get_scaled_taboo(penalty_mult)

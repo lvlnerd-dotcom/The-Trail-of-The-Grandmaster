@@ -1,0 +1,24 @@
+[gd_scene load_steps=7 format=3 uid="uid://merchant_entity_01"]
+
+[ext_resource type="Script" path="res://scripts/entities/Merchant.gd" id="1_merchant"]
+[ext_resource type="Texture2D" path="res://icon.svg" id="2_texture"]
+[ext_resource type="Script" path="res://scripts/components/StatsComponent.gd" id="3_stats"]
+[ext_resource type="Script" path="res://scripts/components/CombatComponent.gd" id="4_combat"]
+[ext_resource type="Script" path="res://scripts/components/InventoryComponent.gd" id="5_inv"]
+
+[node name="Merchant" type="CharacterBody2D"]
+script = ExtResource("1_merchant")
+
+[node name="VisualSprite" type="Sprite2D" parent="."]
+modulate = Color(1, 0.85, 0.2, 1)
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("2_texture")
+
+[node name="StatsComponent" type="Node" parent="."]
+script = ExtResource("3_stats")
+
+[node name="CombatComponent" type="Node" parent="."]
+script = ExtResource("4_combat")
+
+[node name="InventoryComponent" type="Node" parent="."]
+script = ExtResource("5_inv")

@@ -25,9 +25,10 @@ func _get_audio_mgr() -> Node:
 func _get_game_mgr() -> Node:
 	var loop = Engine.get_main_loop()
 	if loop and loop is SceneTree:
-		var node = (loop as SceneTree).root.get_node_or_null("GameManager")
-		if node:
-			return node
+		var root = (loop as SceneTree).root
+		for child in root.get_children():
+			if is_instance_valid(child) and child.name.contains("GameManager"):
+				return child
 	var script = load("res://scripts/autoload/GameManager.gd")
 	if script:
 		var node = track(script.new()) as Node

@@ -76,6 +76,9 @@ func take_damage(amount: int, attacker: Node2D = null) -> int:
         var scc = parent_entity.get_node_or_null("SpellCastingComponent")
         if scc and scc.has_method("absorb_damage"):
             actual_damage = scc.absorb_damage(actual_damage)
+        var sec = parent_entity.get_node_or_null("StatusEffectComponent")
+        if sec and sec.has_method("absorb_damage"):
+            actual_damage = sec.absorb_damage(actual_damage)
     
     if actual_damage > 0:
         current_hp = maxf(0.0, current_hp - actual_damage)

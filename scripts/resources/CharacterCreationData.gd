@@ -3,6 +3,7 @@ extends RefCounted
 
 const SkillData = preload("res://scripts/resources/SkillData.gd")
 const ItemData = preload("res://scripts/resources/ItemData.gd")
+const WeaponManifest = preload("res://scripts/resources/WeaponManifest.gd")
 
 ## CharacterCreationData: Validates starting attributes, skills, and assigns initial equipment packages.
 ## Backgrounds are 100% eliminated; characters are defined by attribute allocation and 4 chosen starting skills.
@@ -142,51 +143,49 @@ static func resolve_starting_equipment(selected_skills: Array) -> Dictionary:
 static func get_items_for_skill(skill_id: SkillData.SkillId) -> Array[ItemData]:
 	match skill_id:
 		SkillData.SkillId.SWORDSMANSHIP:
-			var sword = ItemData.new("sword_iron", "Iron Shortsword", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 2.0)
-			sword.weapon_type = AttributesData.WeaponType.MELEE
-			sword.base_damage_min = 3
-			sword.base_damage_max = 8
-			sword.accuracy_bonus = 0.05
+			var sword = WeaponManifest.create_weapon("sword_short")
+			sword.item_id = "sword_iron"
+			sword.item_name = "Iron Shortsword"
 			return [sword]
 			
-		SkillData.SkillId.MACE_FIGHTING:
-			var mace = ItemData.new("mace_iron", "Flanged Mace", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 3.0)
-			mace.weapon_type = AttributesData.WeaponType.MELEE
-			mace.base_damage_min = 2
-			mace.base_damage_max = 9
+		SkillData.SkillId.BLUNT_WEAPON_FIGHTING:
+			var mace = WeaponManifest.create_weapon("blunt_mace")
+			mace.item_id = "mace_iron"
+			mace.item_name = "Flanged Mace"
 			return [mace]
 			
+		SkillData.SkillId.FINESSE_WEAPON_FIGHTING:
+			var dagger = WeaponManifest.create_weapon("finesse_dagger")
+			return [dagger]
+			
 		SkillData.SkillId.POLEARMS:
-			var spear = ItemData.new("spear_militia", "Militia Spear", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 2.5)
-			spear.weapon_type = AttributesData.WeaponType.MELEE
-			spear.base_damage_min = 3
-			spear.base_damage_max = 7
-			spear.range_tiles = 2
+			var spear = WeaponManifest.create_weapon("polearm_spear")
+			spear.item_id = "spear_militia"
+			spear.item_name = "Militia Spear"
 			return [spear]
 			
 		SkillData.SkillId.BRAWLING:
-			var knuckles = ItemData.new("knuckles_spiked", "Spiked Knuckles", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 1.0)
-			knuckles.weapon_type = AttributesData.WeaponType.MELEE
-			knuckles.base_damage_min = 2
-			knuckles.base_damage_max = 6
+			var knuckles = WeaponManifest.create_weapon("brawling_spiked_knuckles")
+			knuckles.item_id = "knuckles_spiked"
+			knuckles.item_name = "Spiked Knuckles"
+			knuckles.weight_stones = 1.0
 			return [knuckles]
 			
 		SkillData.SkillId.ARCHERY:
-			var bow = ItemData.new("bow_recurve", "Recurve Bow", ItemData.ItemType.WEAPON, ItemData.EquipSlot.MAIN_HAND, 2.0)
-			bow.weapon_type = AttributesData.WeaponType.HIGH_TENSION_BOW
-			bow.base_damage_min = 3
-			bow.base_damage_max = 8
-			bow.range_tiles = 5
+			var bow = WeaponManifest.create_weapon("archery_recurve_bow")
+			bow.item_id = "bow_recurve"
+			bow.item_name = "Recurve Bow"
+			bow.weight_stones = 2.0
 			
 			var quiver = ItemData.new("ammo_arrows", "Quiver of Arrows", ItemData.ItemType.AMMO, ItemData.EquipSlot.AMMUNITION, 1.0, 20)
+			quiver.associated_skill_id = SkillData.SkillId.ARCHERY
 			return [bow, quiver]
 			
 		SkillData.SkillId.THROWING:
-			var knives = ItemData.new("throwing_daggers", "Dagger Pouch (10 Knives)", ItemData.ItemType.AMMO, ItemData.EquipSlot.AMMUNITION, 1.5, 10)
-			knives.weapon_type = AttributesData.WeaponType.THROWN
-			knives.base_damage_min = 2
-			knives.base_damage_max = 6
-			knives.range_tiles = 4
+			var knives = WeaponManifest.create_weapon("throwing_knives", 10)
+			knives.item_id = "throwing_daggers"
+			knives.item_name = "Dagger Pouch (10 Knives)"
+			knives.weight_stones = 1.5
 			return [knives]
 			
 		SkillData.SkillId.DODGE:
@@ -216,7 +215,8 @@ static func get_items_for_skill(skill_id: SkillData.SkillId) -> Array[ItemData]:
 		SkillData.SkillId.ALCHEMY:
 			var medpack = ItemData.new("medpack_combat", "Field Trauma Kit", ItemData.ItemType.CONSUMABLE, ItemData.EquipSlot.NONE, 1.5)
 			var antidote = ItemData.new("potion_antidote", "Antidote Flask", ItemData.ItemType.CONSUMABLE, ItemData.EquipSlot.NONE, 0.5)
-			return [medpack, antidote]
+			var mortar_and_pestle = ItemData.new("mortar_and_pestle", "Mortar and Pestle", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 1.0)
+			return [medpack, antidote, mortar_and_pestle]
 			
 		SkillData.SkillId.SCHOLARSHIP:
 			var grimoire = ItemData.new("scholars_tome", "Ancient Scholar's Grimoire", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 1.5)
@@ -252,6 +252,19 @@ static func get_items_for_skill(skill_id: SkillData.SkillId) -> Array[ItemData]:
 		SkillData.SkillId.SURVIVALISM:
 			var kit = ItemData.new("survival_kit", "Delver's Field Kit", ItemData.ItemType.CONSUMABLE, ItemData.EquipSlot.NONE, 1.5)
 			return [kit]
+			
+		SkillData.SkillId.LOCKPICKING:
+			var thieves_tools = ItemData.new("thieves_tools", "Thieves' Tools", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 0.5)
+			return [thieves_tools]
+			
+		SkillData.SkillId.DISABLE_DEVICE:
+			var thieves_tools = ItemData.new("thieves_tools", "Thieves' Tools", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 0.5)
+			return [thieves_tools]
+			
+		SkillData.SkillId.BARTERING:
+			var merchant_ledger = ItemData.new("merchant_ledger", "Merchant's Coin Ledger", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 0.5)
+			merchant_ledger.set_meta("bonus_gold", 50)
+			return [merchant_ledger]
 			
 		_:
 			var basic_relic = ItemData.new("adventurer_token", "Survivor Token", ItemData.ItemType.RELIC, ItemData.EquipSlot.ACCESSORY, 0.5)

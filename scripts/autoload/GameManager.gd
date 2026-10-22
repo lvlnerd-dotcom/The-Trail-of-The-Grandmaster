@@ -10,6 +10,8 @@ var current_seed: int = 0
 var total_turns_elapsed_run: int = 0
 var pending_creation_data: Dictionary = {}
 var open_creation_on_main_menu: bool = false
+var merchants_hostile_this_run: bool = false
+var run_biomes: Dictionary = {}
 
 const SAVE_DIR = "user://saves"
 const SAVE_PATH = "user://saves/current_run.json"
@@ -33,7 +35,30 @@ func start_new_run(optional_seed: int = 0) -> void:
     seed(current_seed)
     current_floor = 1
     total_turns_elapsed_run = 0
+    merchants_hostile_this_run = false
+    run_biomes = BiomeData.roll_run_biomes(current_seed)
+    AlchemyCatalog.init_run(current_seed)
     is_run_active = true
+
+func get_biome_for_floor(floor_num: int) -> BiomeData:
+    var bracket_idx = clampi((floor_num - 1) / 4, 0, 4)
+    if run_biomes.has(bracket_idx) and run_biomes[bracket_idx] is BiomeData:
+        return run_biomes[bracket_idx]
+    if run_biomes.has(str(bracket_idx)):
+        var b_val = run_biomes[str(bracket_idx)]
+        if b_val is BiomeData:
+            return b_val
+        elif b_val is String:
+            var b = BiomeData.get_biome_by_id(b_val)
+            if b:
+                return b
+    # Fallback initialization if run_biomes empty
+    if run_biomes.is_empty():
+        run_biomes = BiomeData.roll_run_biomes(current_seed if current_seed != 0 else 1)
+        if run_biomes.has(bracket_idx):
+            return run_biomes[bracket_idx]
+    var all_b = BiomeData.get_all_biomes()
+    return all_b[0] if not all_b.is_empty() else null
 
 func end_current_run(is_victory: bool = false) -> void:
     is_run_active = false
@@ -132,6 +157,7 @@ func save_run(world: Node2D) -> bool:
         "turns_remaining": turn_mgr.floor_turns_remaining,
         "total_floor_turns": turn_mgr.floor_total_turns,
         "turn_number": turn_mgr.turn_number,
+        "merchants_hostile_this_run": merchants_hostile_this_run,
         "player": {
             "grid_pos": [player.get("grid_pos").x, player.get("grid_pos").y] if "grid_pos" in player else [0, 0],
             "class_id": player.get_meta("class_id") if player.has_meta("class_id") else "",
@@ -146,6 +172,12 @@ func save_run(world: Node2D) -> bool:
             "gold": player.get_meta("gold") if player.has_meta("gold") else 0
         }
     }
+
+    var biomes_serialized = {}
+    for k in [0, 1, 2, 3, 4]:
+        if run_biomes.has(k) and run_biomes[k] is BiomeData:
+            biomes_serialized[str(k)] = run_biomes[k].biome_id
+    run_data["run_biomes"] = biomes_serialized
     
     var json_str = JSON.stringify(run_data, "  ")
     var hmac_val = calculate_hmac(json_str)
@@ -207,6 +239,16 @@ func load_run_data() -> Dictionary:
         
     # Re-insert hmac for completeness
     data["hmac_sha256"] = stored_hmac
+    merchants_hostile_this_run = bool(data.get("merchants_hostile_this_run", false))
+    if data.has("run_biomes") and data["run_biomes"] is Dictionary:
+        run_biomes.clear()
+        for k in data["run_biomes"].keys():
+            var b_id = str(data["run_biomes"][k])
+            var b = BiomeData.get_biome_by_id(b_id)
+            if b:
+                var idx = int(k)
+                run_biomes[idx] = b
+                run_biomes[idx + 1] = b
     var bus = _get_event_bus()
     if bus and bus.has_signal("run_loaded"):
         bus.emit_signal("run_loaded", SAVE_PATH)

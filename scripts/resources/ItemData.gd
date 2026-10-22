@@ -1,6 +1,10 @@
 class_name ItemData
 extends Resource
 
+const AttributesData = preload("res://scripts/resources/AttributesData.gd")
+const SkillData = preload("res://scripts/resources/SkillData.gd")
+const WeaponAbilityData = preload("res://scripts/resources/WeaponAbilityData.gd")
+
 ## ItemData: Resource representing items, weapons, armor, ammo, and consumables.
 
 enum ItemType {
@@ -29,6 +33,12 @@ enum EquipSlot {
     AMMUNITION
 }
 
+enum Handedness {
+    ONE_HANDED,
+    TWO_HANDED,
+    VERSATILE
+}
+
 static func get_slot_name(slot: EquipSlot) -> String:
     match slot:
         EquipSlot.HEAD: return "Head"
@@ -53,14 +63,38 @@ static func get_slot_name(slot: EquipSlot) -> String:
 @export var base_value_gold: int = 10
 @export var description: String = ""
 @export var quantity: int = 1
+@export var max_stack: int = 1
+@export var is_identified: bool = true
+@export var unlocked_ability_name: String = ""
 
 # Combat stats for weapons
 @export var weapon_type: AttributesData.WeaponType = AttributesData.WeaponType.MELEE
+@export var associated_skill_id: SkillData.SkillId = SkillData.SkillId.SWORDSMANSHIP
+@export var handedness: Handedness = Handedness.ONE_HANDED
 @export var base_damage_min: int = 2
 @export var base_damage_max: int = 8
 @export var accuracy_bonus: float = 0.0
+@export var defense_bonus: float = 0.0
+@export var armor_penetration: float = 0.0
 @export var range_tiles: int = 1
 @export var area_radius: int = 0
+
+# Special Weapon Mechanics
+@export var backstab_multiplier: float = 1.0
+@export var poison_chance: float = 0.0
+@export var bleed_chance: float = 0.0
+@export var stun_chance: float = 0.0
+@export var crit_chance_bonus: float = 0.0
+@export var requires_ammo: bool = false
+@export var is_returning: bool = false
+@export var can_equip_offhand: bool = false
+@export var uses_inventory_weight: bool = false
+@export var is_fragile: bool = false
+@export var is_silver: bool = false
+@export var tags: Array = []
+
+# Level 25 Active Weapon Ability
+@export var active_ability: WeaponAbilityData = null
 
 # Defense stats for armor / shields
 @export var armor_value: int = 0
@@ -87,9 +121,24 @@ func _init(
     weight_stones = p_weight
     quantity = p_quantity
 
+func get_is_identified() -> bool:
+    if has_meta("is_potion") and has_meta("potion_id"):
+        var ac = load("res://scripts/resources/AlchemyCatalog.gd")
+        if ac and ac.has_method("is_potion_identified"):
+            return ac.is_potion_identified(get_meta("potion_id") as String)
+    return is_identified
+
+func get_ability_name() -> String:
+    if unlocked_ability_name != "":
+        return unlocked_ability_name
+    if active_ability:
+        return active_ability.ability_name
+    return ""
+
 static func create_alchemical_bomb(qty: int = 3) -> ItemData:
     var bomb = ItemData.new("alchemical_bomb", "Alchemical Fire Bomb", ItemType.AMMO, EquipSlot.AMMUNITION, 0.5, qty)
     bomb.weapon_type = AttributesData.WeaponType.THROWN
+    bomb.associated_skill_id = SkillData.SkillId.THROWING
     bomb.base_damage_min = 12
     bomb.base_damage_max = 20
     bomb.range_tiles = 5
@@ -101,6 +150,7 @@ static func create_alchemical_bomb(qty: int = 3) -> ItemData:
 static func create_flintlock_pistol() -> ItemData:
     var pistol = ItemData.new("flintlock_pistol", "Dwarven Flintlock Pistol", ItemType.WEAPON, EquipSlot.MAIN_HAND, 2.0, 1)
     pistol.weapon_type = AttributesData.WeaponType.FIREARM
+    pistol.associated_skill_id = SkillData.SkillId.MARKSMANSHIP
     pistol.base_damage_min = 6
     pistol.base_damage_max = 14
     pistol.accuracy_bonus = 0.10
@@ -109,9 +159,29 @@ static func create_flintlock_pistol() -> ItemData:
     pistol.description = "Precision black-powder sidearm with high armor-piercing velocity."
     return pistol
 
+static func create_silver_sword() -> ItemData:
+    var sword = ItemData.new("sword_silver", "Silver Longsword", ItemType.WEAPON, EquipSlot.MAIN_HAND, 2.5, 1)
+    sword.weapon_type = AttributesData.WeaponType.MELEE
+    sword.associated_skill_id = SkillData.SkillId.SWORDSMANSHIP
+    sword.base_damage_min = 5
+    sword.base_damage_max = 11
+    sword.is_silver = true
+    sword.tags = ["silver_weapon"]
+    sword.base_value_gold = 75
+    sword.description = "Blessed blade forged with pure silver inlay. Deadly against the undead."
+    return sword
+
+func get_display_name() -> String:
+    if has_meta("is_potion") and has_meta("potion_id"):
+        var ac = load("res://scripts/resources/AlchemyCatalog.gd")
+        if ac and ac.has_method("get_potion_display_name"):
+            return ac.get_potion_display_name(get_meta("potion_id") as String)
+    return item_name
+
 func get_inspection_data() -> InspectionData:
     var data = InspectionData.new()
-    data.title = item_name if item_name != "" else "Mysterious Object"
+    var d_title = get_display_name()
+    data.title = d_title if d_title != "" else "Mysterious Object"
     data.category = InspectionData.Category.ITEM_OR_OBJECT
     
     var slot_str = get_slot_name(equip_slot)
@@ -151,8 +221,13 @@ func get_inspection_data() -> InspectionData:
     traits.append("Weight: %.1f st" % (weight_stones * quantity))
     if base_value_gold > 0:
         traits.append("Val: %d GP" % base_value_gold)
-    if description != "":
-        traits.append(description)
+    var d_desc = description
+    if has_meta("is_potion") and has_meta("potion_id"):
+        var ac = load("res://scripts/resources/AlchemyCatalog.gd")
+        if ac and ac.has_method("get_potion_display_description"):
+            d_desc = ac.get_potion_display_description(get_meta("potion_id") as String)
+    if d_desc != "":
+        traits.append(d_desc)
         
     data.description = " • ".join(traits)
     return data

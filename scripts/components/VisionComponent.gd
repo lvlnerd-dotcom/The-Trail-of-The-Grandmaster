@@ -34,6 +34,11 @@ func get_perception_vision_bonus(observer: Node2D = null) -> int:
 ## Calculates effective maximum distance of the forward vision reveal cone:
 ## Base view_distance_tiles + (1 tile per 10 levels in Perception skill).
 func get_effective_view_distance(observer: Node2D = null) -> int:
+    var obs = observer if observer else get_parent() as Node2D
+    if obs and obs.has_node("StatusEffectComponent"):
+        var sec = obs.get_node("StatusEffectComponent") as StatusEffectComponent
+        if sec and sec.is_blinded():
+            return 1
     return view_distance_tiles + get_perception_vision_bonus(observer)
 
 ## Evaluates detection chance strictly per design document:

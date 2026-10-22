@@ -28,6 +28,10 @@ var player: Node2D = null
 var registered_enemies: Array[Node2D] = []
 var registered_companions: Array[Node2D] = []
 
+var enemies: Array[Node2D]:
+    get:
+        return registered_enemies
+
 func _get_event_bus() -> Node:
     var loop = Engine.get_main_loop()
     if loop and loop is SceneTree:
@@ -123,13 +127,30 @@ func _process_companion_turns() -> void:
 
 func _process_enemy_turns() -> void:
     for enemy in registered_enemies:
-        if is_instance_valid(enemy) and enemy.has_method("take_turn"):
-            enemy.take_turn()
+        if is_instance_valid(enemy):
+            if enemy.has_node("StatusEffectComponent"):
+                var sec = enemy.get_node("StatusEffectComponent") as StatusEffectComponent
+                if sec and sec.is_stunned():
+                    continue
+            if enemy.has_method("take_turn"):
+                enemy.take_turn()
 
 func _process_world_tick() -> void:
     turn_number += 1
     floor_turns_remaining -= 1
     
+    # Tick Status Effects on Player and Registered Enemies
+    if is_instance_valid(player) and player.has_node("StatusEffectComponent"):
+        var p_sec = player.get_node("StatusEffectComponent") as StatusEffectComponent
+        if p_sec:
+            p_sec.tick_turn()
+
+    for enemy in registered_enemies:
+        if is_instance_valid(enemy) and enemy.has_node("StatusEffectComponent"):
+            var e_sec = enemy.get_node("StatusEffectComponent") as StatusEffectComponent
+            if e_sec:
+                e_sec.tick_turn()
+
     emit_signal("turn_advanced", turn_number)
     emit_signal("floor_timer_ticked", floor_turns_remaining, floor_total_turns)
     

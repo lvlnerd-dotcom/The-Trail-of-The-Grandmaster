@@ -14,6 +14,8 @@ extends BaseEntity
 @onready var spell_casting: SpellCastingComponent = get_node_or_null("SpellCastingComponent") as SpellCastingComponent
 
 var active_shrine_covenant: Dictionary = {}
+var was_overburdened_move: bool = false
+var haste_extra_action_ready: bool = true
 
 func _ready() -> void:
 	super._ready()
@@ -24,6 +26,66 @@ func _ready() -> void:
 			spell_casting.name = "SpellCastingComponent"
 			add_child(spell_casting)
 	action_finished.connect(_on_player_action_finished)
+	_connect_inventory_signals()
+
+func _connect_inventory_signals() -> void:
+	if not inventory:
+		inventory = get_node_or_null("InventoryComponent") as InventoryComponent
+	if inventory:
+		if not inventory.item_equipped.is_connected(_on_equipment_changed):
+			inventory.item_equipped.connect(_on_equipment_changed)
+		if not inventory.item_unequipped.is_connected(_on_equipment_changed):
+			inventory.item_unequipped.connect(_on_equipment_changed)
+
+func _on_equipment_changed(_slot, _item) -> void:
+	apply_optimal_defensive_stance()
+
+func evaluate_optimal_defensive_stance() -> SkillComponent.DefensiveMode:
+	if not skills:
+		skills = get_node_or_null("SkillComponent") as SkillComponent
+	if not skills:
+		return SkillComponent.DefensiveMode.DODGE_EVADE
+	if not stats:
+		stats = get_node_or_null("StatsComponent") as StatsComponent
+	if not inventory:
+		inventory = get_node_or_null("InventoryComponent") as InventoryComponent
+	if not combat:
+		combat = get_node_or_null("CombatComponent") as CombatComponent
+	var attrs: AttributesData = stats.attributes if stats else null
+	var weapon_skill_id = combat.resolve_weapon_skill_id(null, skills, inventory) if combat else SkillData.SkillId.SWORDSMANSHIP
+	var eff_weapon: float = skills.get_effective_level(weapon_skill_id, attrs) if attrs else 10.0
+	var eff_dodge: float = skills.get_effective_level(SkillData.SkillId.DODGE, attrs) if attrs else 10.0
+	var eff_parry: float = skills.get_effective_level(SkillData.SkillId.PARRY, attrs) if attrs else 10.0
+
+	var s_dodge: float = maxf(eff_weapon, eff_dodge)
+	var s_parry: float = maxf(eff_weapon, eff_parry)
+
+	var dm_dodge: float = inventory.get_total_defense_bonus(SkillComponent.DefensiveMode.DODGE_EVADE, skills) if inventory else 0.0
+	var dm_parry: float = inventory.get_total_defense_bonus(SkillComponent.DefensiveMode.PARRY_BLOCK, skills) if inventory else 0.0
+
+	# Expected avoidance score against reference 50 threat: (1 - 50/(S+50)) + DM
+	var score_dodge: float = (1.0 - (50.0 / (s_dodge + 50.0))) + dm_dodge
+	var score_parry: float = (1.0 - (50.0 / (s_parry + 50.0))) + dm_parry
+
+	if not is_equal_approx(score_parry, score_dodge):
+		return SkillComponent.DefensiveMode.PARRY_BLOCK if score_parry > score_dodge else SkillComponent.DefensiveMode.DODGE_EVADE
+
+	# Tie-breaker 1: Compare trained stance skill investment (Parry vs Dodge)
+	if not is_equal_approx(eff_parry, eff_dodge):
+		return SkillComponent.DefensiveMode.PARRY_BLOCK if eff_parry > eff_dodge else SkillComponent.DefensiveMode.DODGE_EVADE
+
+	# Tie-breaker 2: Equipped shield presence prefers Parry stance
+	if inventory and inventory.has_shield_equipped():
+		return SkillComponent.DefensiveMode.PARRY_BLOCK
+
+	return SkillComponent.DefensiveMode.DODGE_EVADE
+
+func apply_optimal_defensive_stance() -> SkillComponent.DefensiveMode:
+	if not skills:
+		return SkillComponent.DefensiveMode.DODGE_EVADE
+	var optimal_mode = evaluate_optimal_defensive_stance()
+	skills.set_defensive_mode(optimal_mode)
+	return optimal_mode
 
 func setup_from_creation_data(data: Dictionary) -> void:
 	if not stats:
@@ -32,6 +94,8 @@ func setup_from_creation_data(data: Dictionary) -> void:
 		skills = get_node_or_null("SkillComponent") as SkillComponent
 	if not inventory:
 		inventory = get_node_or_null("InventoryComponent") as InventoryComponent
+	if not combat:
+		combat = get_node_or_null("CombatComponent") as CombatComponent
 	if not spell_casting:
 		spell_casting = get_node_or_null("SpellCastingComponent") as SpellCastingComponent
 		
@@ -64,6 +128,16 @@ func setup_from_creation_data(data: Dictionary) -> void:
 					spell_casting.learn_spell(SpellData.create_magic_missile())
 				elif item.item_id == "spellbook_minor_heal":
 					spell_casting.learn_spell(SpellData.create_minor_heal())
+					
+			if item.has_meta("bonus_gold"):
+				var bg = int(item.get_meta("bonus_gold"))
+				if inventory:
+					inventory.gold += bg
+				var cur_g = get_meta("gold") if has_meta("gold") else 0
+				set_meta("gold", cur_g + bg)
+
+	_connect_inventory_signals()
+	apply_optimal_defensive_stance()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_moving:
@@ -111,20 +185,47 @@ func _unhandled_input(event: InputEvent) -> void:
 				_handle_click_move(target_cell)
 
 func _handle_move_input(direction: Vector2i) -> void:
+	if status_effects and status_effects.is_stunned():
+		var bus = _get_event_bus()
+		if bus:
+			bus.emit_signal("player_acted", "stunned", {"message": "You are stunned and cannot move!"})
+		if turn_manager:
+			turn_manager.submit_player_action("wait", {"immediate_resolve": true, "message": "You are stunned and cannot move!"})
+		return
 	set_facing_direction(direction)
 	var target_cell = grid_pos + direction
 	
-	# Check if target cell has a hostile occupant -> Melee bump attack!
+	# Check if target cell has an occupant
 	if grid.is_occupied(target_cell):
 		var occupant = grid.get_occupant(target_cell)
-		if occupant and occupant != self and occupant.has_node("StatsComponent"):
-			turn_manager.submit_player_action("melee_attack", {"target": occupant})
-			_execute_melee_attack(occupant, direction)
-			return
+		if occupant and occupant != self:
+			if occupant is Merchant and occupant.is_peaceful:
+				occupant.open_shop(self)
+				return
+			elif occupant is Companion:
+				if occupant.is_hired:
+					_swap_positions_with_companion(occupant, direction)
+					return
+				else:
+					var hire_res = occupant.attempt_hire(self)
+					var bus = _get_event_bus()
+					if bus:
+						bus.emit_signal("player_acted", "hire_mercenary", hire_res)
+					if turn_manager:
+						turn_manager.submit_player_action("hire_mercenary", {"immediate_resolve": true, "result": hire_res})
+					return
+			elif occupant.has_node("StatsComponent"):
+				turn_manager.submit_player_action("melee_attack", {"target": occupant})
+				_execute_melee_attack(occupant, direction)
+				return
 			
 	# Check if walkable -> Move
 	if grid.can_enter(target_cell):
-		turn_manager.submit_player_action("move", {"direction": direction})
+		var is_burdened = false
+		if inventory and stats and stats.attributes:
+			is_burdened = inventory.is_overburdened(stats.attributes.get_max_carry_weight_stones())
+		was_overburdened_move = is_burdened
+		turn_manager.submit_player_action("move", {"direction": direction, "is_overburdened": is_burdened})
 		try_move(direction)
 	else:
 		# Check if hitting a solid wall (plays bump animation, does NOT consume turn)
@@ -143,11 +244,60 @@ func _execute_melee_attack(target: Node2D, direction: Vector2i) -> void:
 	var bus = _get_event_bus()
 	if bus:
 		var def_name = target.get("enemy_name") if "enemy_name" in target else target.name
-		var msg = "Player strikes %s for %d damage!" % [def_name, result["damage"]] if result["hit"] else "Player strikes, but %s %s!" % [def_name, result["defense_type"]]
+		var def_action = result.get("defense_verb", "defends")
+		var msg = "Player strikes %s for %d damage!" % [def_name, result["damage"]] if result["hit"] else "Player strikes, but %s %s!" % [def_name, def_action]
 		bus.emit_signal("player_acted", "melee_attack", {"message": msg, "result": result})
 
 func _execute_wait_turn() -> void:
 	turn_manager.submit_player_action("wait", {"immediate_resolve": true})
+
+func _swap_positions_with_companion(companion: Node2D, direction: Vector2i) -> void:
+	if not grid or not turn_manager:
+		return
+	var player_old_pos = grid_pos
+	var comp_old_pos = companion.grid_pos
+	
+	set_facing_direction(direction)
+	var is_burdened = false
+	if inventory and stats and stats.attributes:
+		is_burdened = inventory.is_overburdened(stats.attributes.get_max_carry_weight_stones())
+	was_overburdened_move = is_burdened
+	
+	turn_manager.submit_player_action("move", {"direction": direction, "is_overburdened": is_burdened, "swap_companion": companion})
+	
+	# Swap in grid occupants dictionary
+	grid.swap_entities(self, player_old_pos, companion, comp_old_pos)
+	
+	# Update positions
+	grid_pos = comp_old_pos
+	companion.grid_pos = player_old_pos
+	
+	# Animate both
+	is_moving = true
+	if "is_moving" in companion:
+		companion.is_moving = true
+	
+	var player_world_pos = grid.grid_to_world(grid_pos)
+	var comp_world_pos = grid.grid_to_world(companion.grid_pos)
+	
+	if move_tween and move_tween.is_valid():
+		move_tween.kill()
+	move_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	move_tween.tween_property(self, "global_position", player_world_pos, move_duration)
+	move_tween.finished.connect(_on_move_tween_finished)
+	
+	var c_duration = companion.get("move_duration") if ("move_duration" in companion) else move_duration
+	var comp_tween = companion.create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	comp_tween.tween_property(companion, "global_position", comp_world_pos, c_duration)
+	comp_tween.finished.connect(func():
+		if "is_moving" in companion:
+			companion.is_moving = false
+	)
+	
+	var bus = _get_event_bus()
+	if bus:
+		bus.emit_signal("entity_moved", self, player_old_pos, grid_pos)
+		bus.emit_signal("entity_moved", companion, comp_old_pos, companion.grid_pos)
 
 func get_ranged_targeting_context() -> Dictionary:
 	if not inventory:
@@ -219,7 +369,20 @@ func _handle_click_move(target_cell: Vector2i) -> void:
 
 func _on_player_action_finished() -> void:
 	if turn_manager and turn_manager.current_state == TurnManager.TurnState.PLAYER_TURN:
+		if status_effects and status_effects.is_hasted() and haste_extra_action_ready:
+			haste_extra_action_ready = false
+			var bus = _get_event_bus()
+			if bus:
+				bus.emit_signal("player_acted", "haste_extra", {"message": "[HASTE] Haste grants an additional action this turn!"})
+			return
+		haste_extra_action_ready = true
 		turn_manager.on_player_action_finished()
+		if was_overburdened_move:
+			was_overburdened_move = false
+			var bus = _get_event_bus()
+			if bus:
+				bus.emit_signal("player_acted", "move_overburdened", {"message": "[OVERBURDENED] Moving under heavy burden consumes 2 turns!"})
+			turn_manager.on_player_action_finished()
 
 
 func get_inspection_data(_viewer: Node2D = null) -> InspectionData:

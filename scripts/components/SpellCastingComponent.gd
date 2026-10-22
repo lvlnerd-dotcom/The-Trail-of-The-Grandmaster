@@ -145,7 +145,8 @@ func calculate_spell_potency(spell: SpellData, target: Node2D = null) -> Diction
 			is_undead = true
 			
 		if is_undead and spell.damage_type == SpellData.DamageType.RADIANT:
-			scaled_base *= spell.bonus_vs_undead_mult
+			var u_mult = spell.bonus_vs_undead_mult if spell.bonus_vs_undead_mult > 1.0 else 2.0
+			scaled_base *= u_mult
 			
 	return {
 		"power_multiplier": power_mult,

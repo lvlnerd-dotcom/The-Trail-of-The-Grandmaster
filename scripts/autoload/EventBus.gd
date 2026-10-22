@@ -42,6 +42,8 @@ signal companion_registered(companion: Node2D)
 signal companion_unregistered(companion: Node2D)
 signal companion_acted(companion: Node2D, action_type: String)
 signal companion_downed(companion: Node2D)
+signal companion_died(companion: Node2D)
+signal companion_order_changed(new_order: int)
 
 # Phase 5: Merchant & Economy Signals
 signal shop_opened(merchant: Node2D, shop_data: Resource)

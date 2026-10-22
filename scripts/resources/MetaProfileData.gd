@@ -27,6 +27,9 @@ signal bestiary_tier_unlocked(creature_id: String, new_tier: int)
 # Achievements registry: Array of achievement IDs
 @export var unlocked_achievements: Array[String] = []
 
+# Persistent cross-run grudges from unforgiving deities
+@export var betrayed_deities: Array[String] = []
+
 ## Required Meta EXP strictly per GDD formula: floor(200 * Rank^1.5)
 func get_required_exp_for_rank(rank_num: int = account_rank) -> int:
 	return int(floor(200.0 * pow(float(rank_num), 1.5)))
@@ -86,7 +89,7 @@ func is_skill_unlocked(p_id: SkillData.SkillId) -> bool:
 	if tier == SkillData.SkillTier.STARTING:
 		return true
 	if tier == SkillData.SkillTier.META:
-		var key = SkillData.SkillId.keys()[p_id]
+		var key = SkillData.get_skill_key(p_id)
 		return is_meta_skill_unlocked(key)
 	return false
 
@@ -135,6 +138,14 @@ func unlock_achievement(achievement_id: String, achievement_title: String) -> bo
 	emit_signal("achievement_unlocked", achievement_id, achievement_title)
 	return true
 
+func record_betrayed_deity(deity_id: String) -> void:
+	var key = deity_id.to_lower()
+	if not betrayed_deities.has(key):
+		betrayed_deities.append(key)
+
+func is_deity_betrayed(deity_id: String) -> bool:
+	return betrayed_deities.has(deity_id.to_lower())
+
 ## Serializes profile to JSON-compatible Dictionary
 func to_dict() -> Dictionary:
 	return {
@@ -147,7 +158,8 @@ func to_dict() -> Dictionary:
 		"total_turns_survived": total_turns_survived,
 		"unlocked_meta_skills": unlocked_meta_skills,
 		"bestiary_records": bestiary_records,
-		"unlocked_achievements": unlocked_achievements
+		"unlocked_achievements": unlocked_achievements,
+		"betrayed_deities": betrayed_deities
 	}
 
 ## Deserializes profile from Dictionary with backward-compatible migration
@@ -177,3 +189,9 @@ func from_dict(dict: Dictionary) -> void:
 		unlocked_achievements.clear()
 		for a in achs:
 			unlocked_achievements.append(str(a))
+			
+	var b_deities = dict.get("betrayed_deities", [])
+	if b_deities is Array:
+		betrayed_deities.clear()
+		for d in b_deities:
+			betrayed_deities.append(str(d).to_lower())

@@ -18,6 +18,27 @@ var grid: DungeonGrid = null
 var fow: FogOfWarSystem = null
 var hovered_cell: Vector2i = Vector2i(-1, -1)
 var active_path: Array[Vector2i] = []
+var hazard_zones: Dictionary = {} # source_id -> Array[Vector2i]
+
+func apply_biome_colors(biome: Resource) -> void:
+	if not biome:
+		return
+	if "wall_color" in biome:
+		wall_color = biome.wall_color
+	if "floor_color" in biome:
+		floor_color = biome.floor_color
+		floor_alt_color = biome.floor_color.lightened(0.05)
+		explored_wall_color = wall_color.darkened(0.5)
+		explored_floor_color = floor_color.darkened(0.5)
+	queue_redraw()
+
+func set_hazard_zone(source_id: String, cells: Array[Vector2i]) -> void:
+	hazard_zones[source_id] = cells
+	queue_redraw()
+
+func remove_hazard_zone(source_id: String) -> void:
+	hazard_zones.erase(source_id)
+	queue_redraw()
 
 func setup(p_grid: DungeonGrid, p_fow: FogOfWarSystem = null) -> void:
 	grid = p_grid
@@ -64,6 +85,17 @@ func _draw() -> void:
 					draw_rect(rect, grid_line_color, false, 0.5)
 				else: # EXPLORED memory
 					draw_rect(rect, explored_floor_color)
+
+	# Draw telegraphed hazard danger tiles (pulsing crimson)
+	for s_id in hazard_zones.keys():
+		var h_cells = hazard_zones[s_id]
+		if h_cells is Array:
+			for c in h_cells:
+				var cv = c as Vector2i
+				if not fow or fow.is_explored(cv):
+					var h_rect = Rect2(Vector2(cv.x * ts.x, cv.y * ts.y), ts)
+					draw_rect(h_rect, Color(1.0, 0.15, 0.15, 0.45))
+					draw_rect(h_rect, Color(1.0, 0.25, 0.25, 0.85), false, 2.0)
 	
 	# Draw active path (only for visible or explored cells)
 	for cell in active_path:

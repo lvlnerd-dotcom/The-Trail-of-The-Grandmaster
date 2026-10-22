@@ -159,9 +159,13 @@ func get_psychic_status_resistance() -> float:
 	return clampf(wisdom * 0.015, 0.0, 0.85)
 
 # --- Charisma Scaling ---
+func get_max_companions() -> int:
+	# Default cap of 1; +1 per 20 points of Charisma (1 at 1-19, 2 at 20, 3 at 40, 4 at 60, 5 at 80, 6 at 100)
+	return 1 + int(max(0, charisma) / 20)
+
 func get_companion_stat_modifier() -> float:
 	# Scales companion & pet base HP and Attack Damage: 10 CHA = 1.0, +2.5% per point
-	return maxf(0.0, 1.0 + (charisma - 10) * 0.025)
+	return maxf(0.10, 1.0 + (charisma - 10) * 0.025)
 
 func get_mercantile_modifier() -> float:
 	# 10 CHA = 1.0 (100%), +1% price favor per point of Charisma (100 CHA = 1.90 / 190%)

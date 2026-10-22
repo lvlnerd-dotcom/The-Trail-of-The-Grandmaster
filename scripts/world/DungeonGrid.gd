@@ -71,6 +71,13 @@ func move_entity(entity: Node2D, from_cell: Vector2i, to_cell: Vector2i) -> bool
     register_entity(entity, to_cell)
     return true
 
+func swap_entities(entity_a: Node2D, cell_a: Vector2i, entity_b: Node2D, cell_b: Vector2i) -> bool:
+    if occupants.get(cell_a) != entity_a or occupants.get(cell_b) != entity_b:
+        return false
+    occupants[cell_a] = entity_b
+    occupants[cell_b] = entity_a
+    return true
+
 # Coordinate conversions
 func grid_to_world(grid_pos: Vector2i) -> Vector2:
     return Vector2(

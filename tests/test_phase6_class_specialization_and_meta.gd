@@ -163,8 +163,10 @@ func test_class_exclusive_skill_unlock() -> void:
 
 func test_tri_tier_skill_taxonomy() -> void:
 	var starting_skills = SkillData.get_skills_by_tier(SkillData.SkillTier.STARTING)
-	assert_eq(starting_skills.size(), 14, "Tier 1 must have exactly 14 Starting skills (Marksmanship removed)")
+	assert_eq(starting_skills.size(), 18, "Tier 1 must have exactly 18 Starting skills (7 weapon skills + 11 utility/defense/magic/ecosystem skills)")
 	assert_false(starting_skills.has(SkillData.SkillId.MARKSMANSHIP), "Marksmanship must NOT be in Tier 1")
+	assert_true(starting_skills.has(SkillData.SkillId.BLUNT_WEAPON_FIGHTING), "Tier 1 must include Blunt Weapon Fighting")
+	assert_true(starting_skills.has(SkillData.SkillId.FINESSE_WEAPON_FIGHTING), "Tier 1 must include Finesse Weapon Fighting")
 	assert_true(starting_skills.has(SkillData.SkillId.ARCHERY), "Tier 1 must include Archery")
 	assert_true(starting_skills.has(SkillData.SkillId.THROWING), "Tier 1 must include Throwing")
 	assert_true(starting_skills.has(SkillData.SkillId.DIVINE_MAGIC), "Tier 1 must include Divine Magic")
@@ -201,8 +203,9 @@ func test_starting_skill_drafting_and_validation() -> void:
 	assert_eq(CharacterCreationData.REQUIRED_STARTING_SKILLS_COUNT, 4, "Must require exactly 4 starting skills")
 	assert_eq(CharacterCreationData.STARTING_ATTRIBUTE_POINTS, 20, "Must require 20 attribute points")
 	
-	var available = CharacterCreationData.get_available_starting_skills()
-	assert_eq(available.size(), 14, "Account Rank 1 gets exactly 14 starting skills")
+	var rank1_profile = MetaProfileData.new()
+	var available = CharacterCreationData.get_available_starting_skills(rank1_profile)
+	assert_eq(available.size(), 18, "Account Rank 1 gets exactly 18 starting skills")
 	
 	# Valid 20 attribute points
 	var valid_attrs = {

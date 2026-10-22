@@ -275,3 +275,15 @@ static func create_divine_aegis() -> SpellData:
 	spell.cast_sfx = "spell_cast_aegis"
 	spell.hit_sfx = "spell_aegis_activate"
 	return spell
+
+static func create_spell_by_id(p_id: String) -> SpellData:
+	match p_id:
+		"magic_missile": return create_magic_missile()
+		"fireball": return create_fireball()
+		"blink": return create_blink()
+		"arcane_shield": return create_arcane_shield()
+		"minor_heal": return create_minor_heal()
+		"smite": return create_smite()
+		"purify": return create_purify()
+		"divine_aegis": return create_divine_aegis()
+		_: return null

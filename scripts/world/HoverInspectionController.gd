@@ -144,7 +144,11 @@ func inspect_cell(cell: Vector2i) -> InspectionData:
 	if world and world.stairs_down and is_instance_valid(world.stairs_down) and world.stairs_down.grid_pos == cell and world.stairs_down.visible:
 		return world.stairs_down.get_inspection_data()
 		
-	# 4.3. Check Dungeon Objects (Shrine, WorldItem)
+	# 4.3. Check Dungeon Objects (Chest, Shrine, WorldItem)
+	var chest_vis = _get_chest_at(cell)
+	if chest_vis:
+		return chest_vis.get_inspection_data()
+
 	var shrine_vis = _get_shrine_at(cell)
 	if shrine_vis:
 		return shrine_vis.get_inspection_data()
@@ -222,6 +226,14 @@ func _inspect_terrain(cell: Vector2i, is_remembered: bool) -> InspectionData:
 		data.accent_color = Color(data.accent_color.r * 0.7, data.accent_color.g * 0.7, data.accent_color.b * 0.7)
 		
 	return data
+
+func _get_chest_at(cell: Vector2i) -> TreasureChest:
+	if not world or not world.dungeon_objects:
+		return null
+	for child in world.dungeon_objects.get_children():
+		if child is TreasureChest and child.grid_pos == cell:
+			return child
+	return null
 
 func _get_shrine_at(cell: Vector2i) -> Shrine:
 	if not world or not world.dungeon_objects:
